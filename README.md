@@ -39,15 +39,39 @@ El modelo deberá aprender la relación existente entre estas variables y la dem
 
 ## Algoritmo utilizado
 
+## Algoritmo utilizado
 
+* **Modelo Principal:** `Random Forest Regressor`
+  * **Razón de selección:** Es un algoritmo de ensamble (Bagging) capaz de capturar relaciones no lineales complejas entre las características (clima, hora, día de la semana, etc.) y la demanda de alquileres, ofreciendo un alto rendimiento y reduciendo el sobreajuste (*overfitting*).
+* **Modelo Baseline (Base):** `Ridge Regression`
+  * **Razón de selección:** Se utilizó como punto de comparación inicial para medir la efectividad de un modelo lineal regularizado frente a un modelo basado en árboles.
+* **Preprocesamiento:** Ambos modelos se integraron en un `Pipeline` de Scikit-Learn que incluyó imputación de valores faltantes (mediana), escalamiento de variables numéricas y codificación `One-Hot Encoding` para variables categóricas.
 
 ## Métrica empleada
 
+## Métricas empleadas
 
+Se seleccionó un conjunto de tres métricas complementarias para evaluar los modelos de regresión:
+
+1. **MAE (Mean Absolute Error):** Mide el error absoluto promedio en las mismas unidades de la variable objetivo. Permite interpretar de manera directa cuántos alquileres por hora se desvía el modelo en promedio.
+2. **RMSE (Root Mean Squared Error):** Penaliza con mayor severidad las grandes desviaciones o errores atípicos, permitiendo evaluar la precisión del modelo ante picos inusuales en la demanda.
+3. **R² (Coeficiente de determinación):** Cuantifica el porcentaje de variabilidad de la demanda horaria que el modelo logra explicar.
 
 ## Principales resultados obtenidos
 
+## Principales resultados obtenidos
 
+Al evaluar los modelos en el conjunto de prueba (20% de los datos), el modelo **Random Forest Regressor** superó significativamente al modelo base (**Ridge Regression**):
+
+| Modelo | MAE | RMSE | R² |
+| :--- | :---: | :---: | :---: |
+| **Ridge Regression (Baseline)** | 74.06 | 100.49 | 0.6811 (68.11%) |
+| **Random Forest Regressor** | **29.34** | **48.02** | **0.9272 (92.72%)** |
+
+**Conclusiones clave de los resultados:**
+* **Reducción del error:** Random Forest redujo el error promedio (`MAE`) a menos de la mitad, pasando de ~74 a ~29 alquileres de diferencia respecto al valor real.
+* **Mayor estabilidad:** El `RMSE` disminuyó de 100.49 a 48.02, lo que demuestra una importante reducción en la magnitud de los errores grandes.
+* **Alto poder explicativo:** El modelo logró un `R²` de **0.9272**, explicando el **92.72%** de la variabilidad de la demanda de bicicletas, frente a solo el 68.11% del baseline.
 
 ## Instrucciones para ejecutar el notebook
 

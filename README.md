@@ -37,7 +37,6 @@ Desarrollar un modelo de **Machine Learning** capaz de predecir la cantidad de b
 
 El modelo deberá aprender la relación existente entre estas variables y la demanda histórica de bicicletas, con el propósito de generar predicciones que puedan ser utilizadas para anticipar los períodos de mayor y menor demanda.
 
-## Algoritmo utilizado
 
 ## Algoritmo utilizado
 
@@ -47,7 +46,6 @@ El modelo deberá aprender la relación existente entre estas variables y la dem
   * **Razón de selección:** Se utilizó como punto de comparación inicial para medir la efectividad de un modelo lineal regularizado frente a un modelo basado en árboles.
 * **Preprocesamiento:** Ambos modelos se integraron en un `Pipeline` de Scikit-Learn que incluyó imputación de valores faltantes (mediana), escalamiento de variables numéricas y codificación `One-Hot Encoding` para variables categóricas.
 
-## Métrica empleada
 
 ## Métricas empleadas
 
@@ -57,7 +55,6 @@ Se seleccionó un conjunto de tres métricas complementarias para evaluar los mo
 2. **RMSE (Root Mean Squared Error):** Penaliza con mayor severidad las grandes desviaciones o errores atípicos, permitiendo evaluar la precisión del modelo ante picos inusuales en la demanda.
 3. **R² (Coeficiente de determinación):** Cuantifica el porcentaje de variabilidad de la demanda horaria que el modelo logra explicar.
 
-## Principales resultados obtenidos
 
 ## Principales resultados obtenidos
 

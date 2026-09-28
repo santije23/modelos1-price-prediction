@@ -1,0 +1,38 @@
+{
+  "modelo": "RandomForestRegressor",
+  "hiperparametros": {
+    "n_estimators": 200,
+    "random_state": 42
+  },
+  "baseline_ridge": {
+    "mae": 74.05761574607949,
+    "rmse": 100.48732379218193,
+    "r2": 0.6811125509906382
+  },
+  "test": {
+    "mae": 29.338986622554657,
+    "rmse": 48.01746298011166,
+    "r2": 0.9271862687476968
+  },
+  "sensibilidad_nulos": {
+    "rmse_con_nulos": 48.01746298011166,
+    "rmse_sin_nulos": 47.894603641898726,
+    "r2_con_nulos": 0.9271862687476968,
+    "r2_sin_nulos": 0.9275584001217886,
+    "diff_relativa_rmse_pct": 0.2565202107768454
+  },
+  "features": [
+    "season",
+    "yr",
+    "mnth",
+    "hr",
+    "holiday",
+    "weekday",
+    "workingday",
+    "weathersit",
+    "temp",
+    "hum",
+    "windspeed"
+  ],
+  "random_state": 42
+}

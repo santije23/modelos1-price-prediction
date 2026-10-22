@@ -7,17 +7,17 @@ Los grupos están ordenados en un orden lógico de trabajo, no en el del documen
 ---
 
 ## 0. Preparación del repositorio y Git
-- [ ] Conservar la carpeta `fase-1` sin tocarla
-- [ ] Crear la carpeta `fase-2` en el mismo repositorio
+- [X] Conservar la carpeta `fase-1` sin tocarla
+- [X] Crear la carpeta `fase-2` en el mismo repositorio
 - [ ] Crear la rama `develop` (si no existe) y trabajar con ramas `feature/*` (ej. `feature/train-script`, `feature/predict-script`, `feature/docker-tests`)
-- [ ] No hacer cambios de desarrollo directamente en `main`
-- [ ] Crear la estructura base:
-  - [ ] `train.py`, `predict.py`
-  - [ ] `src/` (lógica compartida, recomendado)
-  - [ ] `tests/test_aplicacion.py`
-  - [ ] `data/ejemplo_prediccion.csv`
-  - [ ] `models/`, `outputs/`
-  - [ ] `requirements.txt`, `Dockerfile`, `.dockerignore`, `.gitignore`, `README.md`
+- [X] No hacer cambios de desarrollo directamente en `main`
+- [X] Crear la estructura base:
+  - [X] `train.py`, `predict.py`
+  - [X] `src/` (lógica compartida, recomendado)
+  - [X] `tests/test_aplicacion.py`
+  - [X] `data/ejemplo_prediccion.csv`
+  - [X] `models/`, `outputs/`
+  - [X] `requirements.txt`, `Dockerfile`, `.dockerignore`, `.gitignore`, `README.md`
 
 ## 1. Correcciones de la Fase 1
 - [ ] Revisar la retroalimentación de la Fase 1

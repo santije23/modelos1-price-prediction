@@ -4,7 +4,7 @@
 
 **Integrantes:** Santiago Jiménez Escobar · Santiago Durán Carmona
 
-> 🚧 **Borrador en construcción.** Las secciones marcadas con 🚧 se completan en los siguientes pasos de la Fase 2 (pruebas, Docker, versiones definitivas). Este documento ya cubre la **organización del código** y el uso de `train.py` y `predict.py`.
+> 🚧 **Borrador en construcción.** Las secciones marcadas con 🚧 se completan en los siguientes pasos de la Fase 2 (pytest, Docker, versiones definitivas). Este documento ya cubre la **organización del código**, el uso de `train.py` y `predict.py` y la **evidencia de las pruebas manuales** de ambos scripts (sección 10).
 
 ---
 
@@ -39,10 +39,11 @@ La estrategia de nulos, la selección de variables (exclusión de `casual` y `re
 fase-2/
 ├── train.py              # punto de entrada: entrena y guarda una versión
 ├── predict.py            # punto de entrada: predice con una versión guardada
-├── prepare_data.py       # 🚧 punto de entrada: genera el CSV con nulos inyectados (MCAR)
 ├── requirements.txt      # 🚧
 ├── Dockerfile            # 🚧
 ├── .dockerignore         # 🚧
+├── pruebas.md            # evidencia de las pruebas manuales (capturas en img/)
+├── img/                  # capturas de pantalla de las pruebas manuales
 ├── src/
 │   ├── config.py         # constantes: variable objetivo y columnas
 │   ├── data.py           # lectura y validación de datos
@@ -53,8 +54,7 @@ fase-2/
 │   └── prediction.py     # validación y predicción sobre datos nuevos
 ├── tests/                # 🚧 pruebas con pytest
 ├── data/
-│   ├── raw/              # datos originales (no se modifican)
-│   ├── processed/        # datos derivados (CSV con nulos inyectados)
+│   ├── processed/        # CSV con nulos inyectados (generado en la Fase 1)
 │   └── ejemplo_prediccion.csv
 ├── models/               # versiones del modelo: v1/, v2/, ...
 └── outputs/              # predicciones generadas
@@ -100,9 +100,9 @@ El preprocesamiento es un `ColumnTransformer` dentro de un `Pipeline`, y se ajus
 
 ## 5. Datos
 
-- **Fuente:** [Bike Sharing Dataset (Kaggle)](https://www.kaggle.com/datasets/amil09/bike-sharing-dataset/data?select=Bike+Share+hourly.csv).
-- **Ubicación esperada:** descargar el archivo, renombrarlo a `bike_share_hourly.csv` y colocarlo en `fase-2/data/raw/`.
-- **Datos con nulos inyectados:** la Fase 1 inyectó valores faltantes MCAR (1,2 % en `hum` y 1,7 % en `windspeed`, semilla 42). 🚧 El script `prepare_data.py` regenera `data/processed/bike_share_with_nans.csv` a partir del archivo original.
+- **Fuente original:** [Bike Sharing Dataset (Kaggle)](https://www.kaggle.com/datasets/amil09/bike-sharing-dataset/data?select=Bike+Share+hourly.csv).
+- **Archivo utilizado:** el dataset original no contiene valores nulos, por lo que se usa el archivo generado en la Fase 1, que ya incluye los nulos inyectados. Se llama `bike_share_with_nans.csv` y está en `fase-2/data/processed/`. Se incluye en el repositorio, por lo que **no es necesario descargar nada de Kaggle** para entrenar.
+- **Datos con nulos inyectados:** la Fase 1 inyectó valores faltantes MCAR (1,2 % en `hum` y 1,7 % en `windspeed`, semilla 42) en el notebook `fase-1/notebooks/01_modelo_predictivo.ipynb` (sección de inyección MCAR).
 
 ### Esquema del CSV de predicción
 
@@ -183,7 +183,7 @@ models/
 
 ## 8. Resultados
 
-Métricas en el conjunto de prueba (días no vistos), partición agrupada por día, semilla 42. Valores **provisionales** de una ejecución de verificación; 🚧 se actualizarán con la versión entregada.
+Métricas en el conjunto de prueba (días no vistos), partición agrupada por día, semilla 42. Valores **provisionales** de una ejecución de verificación; se actualizarán con la versión `v1` entregada.
 
 | Modelo | MAE | RMSE | R² |
 |---|---|---|---|
@@ -203,7 +203,29 @@ El Random Forest reduce el MAE en ≈ 56 % y el RMSE en ≈ 47 % frente al basel
 
 *Pendiente: comandos de construcción y ejecución con montajes de carpetas.*
 
-## 10. 🚧 Pruebas
+## 10. Pruebas
+
+### 10.1 Pruebas manuales de `train.py` y `predict.py`
+
+Se ejecutaron a mano los casos normales y los errores previsibles de ambos scripts. El detalle y las capturas completas están en [`pruebas.md`](pruebas.md). Resumen:
+
+| # | Prueba | Resultado esperado | Evidencia |
+|---|---|---|---|
+| 1 | Importar `train` y `predict` (`python -c "import train"`, `python -c "import predict"`) y consultar `--help` en ambos | No se ejecuta nada al importar; `--help` lista los argumentos de cada script | [1](img/1.png), [2](img/2.png) |
+| 2 | **`train.py`**: ejecución con ruta de datos, variable objetivo, directorio de salida, versión, semilla y parámetros de partición | Resumen de métricas (modelo y baseline) y rutas de los archivos generados | [3](img/3.png) |
+| 3 | **`train.py`**: estructura de la versión creada | `models/<versión>/` con `modelo.joblib`, `metrics.json` y `metadata.json` | [4](img/4.png) |
+| 4 | **`train.py`**: contenido de `metadata.json` | Versión, fecha, tipo de problema, objetivo, algoritmo, variables y tipos, parámetros y semilla, datos usados, partición, versión de Python y hash del commit | [6](img/6.png), [7](img/7.png), [8](img/8.png) |
+| 5 | **`train.py`**: identificador de versión repetido | `ERROR` claro, código de salida distinto de cero; la versión existente no se modifica | [9](img/9.png) |
+| 6 | **`train.py`**: archivo de datos inexistente | `ERROR` claro y código de salida distinto de cero | [10](img/10.png) |
+| 7 | **`train.py`**: variable objetivo inexistente | `ERROR` claro y código de salida distinto de cero | [11](img/11.png) |
+| 8 | **`predict.py`**: ejecución con ruta del modelo, CSV de entrada (sin variable objetivo) y CSV de salida | Se genera el CSV con `fila` y `prediccion`, una fila por cada fila de entrada | [12](img/12.png), [13](img/13.png) |
+| 9 | **`predict.py`**: modelo inexistente | `ERROR` claro y código de salida distinto de cero | [14](img/14.png) |
+| 10 | **`predict.py`**: columna requerida ausente en el CSV de entrada | `ERROR` que indica la columna faltante; no se crea el archivo de salida | [15](img/15.png) |
+| 11 | **`predict.py`**: tipo de dato incompatible (texto en una columna numérica) | `ERROR` que indica la columna y el tipo; no se crea el archivo de salida | [16](img/16.png) |
+
+> Pendientes de evidenciar: reordenamiento de columnas del CSV de entrada, columnas adicionales (por ejemplo `cnt`) y selección explícita entre dos versiones (`v1` y `v2`).
+
+### 10.2 🚧 Pruebas automatizadas con pytest
 
 *Pendiente: comando `python -m pytest` y descripción de las pruebas.*
 

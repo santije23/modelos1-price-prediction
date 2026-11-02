@@ -1,73 +1,62 @@
-"""Partición, construcción y ajuste de modelos. No lee ni escribe archivos."""
+"""Entrenamiento del modelo."""
 
+import json
+from pathlib import Path
+from typing import Any, Dict
+
+import joblib
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import Ridge
-from sklearn.model_selection import GroupShuffleSplit
-from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
 
-from src.config import FEATURE_COLS, GROUP_COL, TARGET
-from src.data import DataValidationError
-from src.preprocessing import build_preprocessor
-
-MODEL_NAMES = ("ridge", "random_forest")
+from bike_demand.data.loader import load_data
+from bike_demand.data.validation import validate_schema, validate_target
+from bike_demand.features.build_features import build_pipeline, prepare_dataframe
+from bike_demand.utils.metrics import compute_metrics
 
 
-def split_data(df, test_size=0.2, seed=42,
-               feature_cols=None, target=TARGET, group_col=GROUP_COL):
-    """Separa train/test agrupando por día: un día completo va a un solo conjunto.
+def train_model(config: Dict[str, Any]) -> Dict[str, float]:
+    """Entrena el modelo, guarda artefactos y devuelve las métricas.
 
-    Devuelve X_train, X_test, y_train, y_test e info (tamaños y días por conjunto).
+    Args:
+        config: Diccionario de configuración cargado desde YAML.
+
+    Returns:
+        Diccionario con MAE, RMSE y R² en test.
     """
-    feature_cols = FEATURE_COLS if feature_cols is None else feature_cols
+    data_cfg = config["data"]
+    feat_cfg = config["features"]
+    model_cfg = config["model"]
+    out_cfg = config["output"]
 
-    if not 0 < test_size < 1:
-        raise DataValidationError(f"test_size debe estar entre 0 y 1, se recibió {test_size}")
-    if df[group_col].isnull().any():
-        raise DataValidationError(f"La columna de grupo '{group_col}' tiene valores nulos.")
-    if df[group_col].nunique() < 2:
-        raise DataValidationError(
-            f"Se necesitan al menos 2 grupos distintos en '{group_col}' para separar train y test."
-        )
+    df = load_data(data_cfg["raw_path"])
+    validate_schema(df)
+    validate_target(df, data_cfg["target"])
 
-    X = df[feature_cols]
-    y = df[target]
-    groups = df[group_col]
+    periods = {"hr": 24, "mnth": 12}
+    X, y = prepare_dataframe(
+        df,
+        drop_columns=feat_cfg["drop_columns"],
+        leakage_columns=data_cfg["leakage_columns"],
+        cyclic_columns=feat_cfg["cyclic_columns"],
+        periods=periods,
+        target=data_cfg["target"],
+    )
 
-    splitter = GroupShuffleSplit(n_splits=1, test_size=test_size, random_state=seed)
-    train_idx, test_idx = next(splitter.split(X, y, groups=groups))
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=data_cfg["test_size"], random_state=config["project"]["seed"]
+    )
 
-    info = {
-        "strategy": f"GroupShuffleSplit por '{group_col}'",
-        "test_size": test_size,
-        "n_train": int(len(train_idx)),
-        "n_test": int(len(test_idx)),
-        "n_groups_train": int(groups.iloc[train_idx].nunique()),
-        "n_groups_test": int(groups.iloc[test_idx].nunique()),
-    }
-    return (X.iloc[train_idx], X.iloc[test_idx],
-            y.iloc[train_idx], y.iloc[test_idx], info)
+    model = RandomForestRegressor(**model_cfg["params"])
+    pipeline = build_pipeline(numeric_features=list(X.columns), model=model)
+    pipeline.fit(X_train, y_train)
 
+    preds = pipeline.predict(X_test)
+    metrics = compute_metrics(y_test, preds)
 
-def build_model(name, seed=42, params=None):
-    """Devuelve un Pipeline (preprocesamiento + modelo) SIN ajustar."""
-    params = dict(params or {})
+    Path(out_cfg["model_path"]).parent.mkdir(parents=True, exist_ok=True)
+    Path(out_cfg["metrics_path"]).parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(pipeline, out_cfg["model_path"])
+    with open(out_cfg["metrics_path"], "w", encoding="utf-8") as f:
+        json.dump(metrics, f, indent=2)
 
-    if name == "ridge":
-        estimator = Ridge(**{"alpha": 1.0, **params})
-    elif name == "random_forest":
-        estimator = RandomForestRegressor(
-            **{"n_estimators": 200, "n_jobs": -1, **params, "random_state": seed}
-        )
-    else:
-        raise ValueError(f"Modelo desconocido: '{name}'. Opciones: {MODEL_NAMES}")
-
-    return Pipeline(steps=[
-        ("preprocessor", build_preprocessor()),
-        ("model", estimator),
-    ])
-
-
-def fit_model(model, X_train, y_train):
-    """Ajusta el pipeline completo SOLO con datos de entrenamiento."""
-    model.fit(X_train, y_train)
-    return model
+    return metrics

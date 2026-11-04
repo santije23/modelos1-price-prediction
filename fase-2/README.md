@@ -211,17 +211,17 @@ Se ejecutaron a mano los casos normales y los errores previsibles de ambos scrip
 
 | # | Prueba | Resultado esperado | Evidencia |
 |---|---|---|---|
-| 1 | Importar `train` y `predict` (`python -c "import train"`, `python -c "import predict"`) y consultar `--help` en ambos | No se ejecuta nada al importar; `--help` lista los argumentos de cada script | [1](img/1.png), [2](img/2.png) |
-| 2 | **`train.py`**: ejecución con ruta de datos, variable objetivo, directorio de salida, versión, semilla y parámetros de partición | Resumen de métricas (modelo y baseline) y rutas de los archivos generados | [3](img/3.png) |
-| 3 | **`train.py`**: estructura de la versión creada | `models/<versión>/` con `modelo.joblib`, `metrics.json` y `metadata.json` | [4](img/4.png) |
-| 4 | **`train.py`**: contenido de `metadata.json` | Versión, fecha, tipo de problema, objetivo, algoritmo, variables y tipos, parámetros y semilla, datos usados, partición, versión de Python y hash del commit | [6](img/6.png), [7](img/7.png), [8](img/8.png) |
-| 5 | **`train.py`**: identificador de versión repetido | `ERROR` claro, código de salida distinto de cero; la versión existente no se modifica | [9](img/9.png) |
-| 6 | **`train.py`**: archivo de datos inexistente | `ERROR` claro y código de salida distinto de cero | [10](img/10.png) |
-| 7 | **`train.py`**: variable objetivo inexistente | `ERROR` claro y código de salida distinto de cero | [11](img/11.png) |
-| 8 | **`predict.py`**: ejecución con ruta del modelo, CSV de entrada (sin variable objetivo) y CSV de salida | Se genera el CSV con `fila` y `prediccion`, una fila por cada fila de entrada | [12](img/12.png), [13](img/13.png) |
-| 9 | **`predict.py`**: modelo inexistente | `ERROR` claro y código de salida distinto de cero | [14](img/14.png) |
-| 10 | **`predict.py`**: columna requerida ausente en el CSV de entrada | `ERROR` que indica la columna faltante; no se crea el archivo de salida | [15](img/15.png) |
-| 11 | **`predict.py`**: tipo de dato incompatible (texto en una columna numérica) | `ERROR` que indica la columna y el tipo; no se crea el archivo de salida | [16](img/16.png) |
+| 1 | Importar `train` y `predict` (`python -c "import train"`, `python -c "import predict"`) y consultar `--help` en ambos | No se ejecuta nada al importar; `--help` lista los argumentos de cada script | [1](img/1.PNG), [2](img/2.PNG) |
+| 2 | **`train.py`**: ejecución con ruta de datos, variable objetivo, directorio de salida, versión, semilla y parámetros de partición | Resumen de métricas (modelo y baseline) y rutas de los archivos generados | [3](img/3.PNG) |
+| 3 | **`train.py`**: estructura de la versión creada | `models/<versión>/` con `modelo.joblib`, `metrics.json` y `metadata.json` | [4](img/4.PNG) |
+| 4 | **`train.py`**: contenido de `metadata.json` | Versión, fecha, tipo de problema, objetivo, algoritmo, variables y tipos, parámetros y semilla, datos usados, partición, versión de Python y hash del commit | [6](img/6.PNG), [7](img/7.PNG), [8](img/8.PNG) |
+| 5 | **`train.py`**: identificador de versión repetido | `ERROR` claro, código de salida distinto de cero; la versión existente no se modifica | [9](img/9.PNG) |
+| 6 | **`train.py`**: archivo de datos inexistente | `ERROR` claro y código de salida distinto de cero | [10](img/10.PNG) |
+| 7 | **`train.py`**: variable objetivo inexistente | `ERROR` claro y código de salida distinto de cero | [11](img/11.PNG) |
+| 8 | **`predict.py`**: ejecución con ruta del modelo, CSV de entrada (sin variable objetivo) y CSV de salida | Se genera el CSV con `fila` y `prediccion`, una fila por cada fila de entrada | [12](img/12.PNG), [13](img/13.PNG) |
+| 9 | **`predict.py`**: modelo inexistente | `ERROR` claro y código de salida distinto de cero | [14](img/14.PNG) |
+| 10 | **`predict.py`**: columna requerida ausente en el CSV de entrada | `ERROR` que indica la columna faltante; no se crea el archivo de salida | [15](img/15.PNG) |
+| 11 | **`predict.py`**: tipo de dato incompatible (texto en una columna numérica) | `ERROR` que indica la columna y el tipo; no se crea el archivo de salida | [16](img/16.PNG) |
 
 > Pendientes de evidenciar: reordenamiento de columnas del CSV de entrada, columnas adicionales (por ejemplo `cnt`) y selección explícita entre dos versiones (`v1` y `v2`).
 

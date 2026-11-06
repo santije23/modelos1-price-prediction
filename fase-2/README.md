@@ -1,10 +1,24 @@
-# Predicción de la demanda horaria de bicicletas compartidas — Fase 2
+# Predicción de la demanda horaria de bicicletas compartidas - Fase 2
 
-**Proyecto Integrador · Modelos y Simulación de Sistemas I · 2026 II**
+**Proyecto Integrador - Modelos y Simulación de Sistemas I - 2026 II**
 
-**Integrantes:** Santiago Jiménez Escobar · Santiago Durán Carmona
+**Integrantes:** Santiago Jiménez Escobar & Santiago Durán Carmona
 
-> 🚧 **Borrador en construcción.** Las secciones marcadas con 🚧 se completan en los siguientes pasos de la Fase 2 (pytest, Docker, versiones definitivas). Este documento ya cubre la **organización del código**, el uso de `train.py` y `predict.py` y la **evidencia de las pruebas manuales** de ambos scripts (sección 10).
+---
+
+## Tabla de contenido
+
+1. [Problema y relación con la Fase 1](#1-problema-y-relaci%C3%B3n-con-la-fase-1)
+2. [Cambios respecto a la Fase 1](#2-cambios-respecto-a-la-fase-1)
+3. [Organización del código](#3-organizaci%C3%B3n-del-c%C3%B3digo)
+4. [Preprocesamiento y reglas de datos](#4-preprocesamiento-y-reglas-de-datos)
+5. [Datos](#5-datos)
+6. [Ejecución local](#6-ejecuci%C3%B3n-local)
+7. [Versiones del modelo](#7-versiones-del-modelo)
+8. [Resultados](#8-resultados)
+9. [Docker](#9-docker)
+10. [Pruebas](#10-pruebas)
+11. [Identificación de la entrega y fuentes](#11-identificaci%C3%B3n-de-la-entrega-y-fuentes)
 
 ---
 
@@ -14,222 +28,431 @@ Se predice **`cnt`**, el número de bicicletas alquiladas en una hora, a partir 
 
 La Fase 1 (carpeta `fase-1/`, conservada sin cambios) desarrolló el análisis y el modelo en un notebook. La Fase 2 convierte ese trabajo en una aplicación ejecutable por línea de comandos:
 
-- `train.py` entrena el modelo y el modelo base, y guarda una **versión** identificable.
-- `predict.py` carga una versión guardada y genera predicciones sobre datos nuevos.
+- `scripts/train.py` entrena el modelo y guarda una **versión** identificable.
+- `scripts/evaluate.py` evalúa una versión guardada sobre el conjunto de prueba.
+- `src/bike_demand/models/predict.py` expone la función de inferencia, reutilizable sobre datos nuevos.
 
-Se conservan el problema, el conjunto de datos y el enfoque de modelado: **Random Forest** como modelo y **Ridge** como modelo base (baseline).
+Se conservan el problema, el conjunto de datos y el enfoque de modelado: **Random Forest** como modelo.
 
 ## 2. Cambios respecto a la Fase 1
 
-| Aspecto | Fase 1 | Fase 2 |
+|Aspecto|Fase 1|Fase 2|
 |---|---|---|
-| Partición train/test | Aleatoria (`train_test_split`), con horas del mismo día en ambos conjuntos | **Agrupada por día** (`GroupShuffleSplit` sobre `dteday`): cada día completo va a un solo conjunto |
-| Organización | Un notebook | Módulos reutilizables en `src/` + dos scripts con `argparse` |
-| Validación de datos | No había | Se valida archivo, columnas, tipos y variable objetivo, con mensajes de error claros |
-| Almacenamiento | `model_v1.joblib` + `metricas_v1.json` sueltos | Una carpeta por versión con modelo, métricas y metadatos; nunca se sobrescribe |
-| Rutas | Detectadas desde el notebook (`BASE_DIR`) | Siempre por argumentos de línea de comandos |
+|Organización|Un notebook|Paquete `src/bike_demand/` + scripts con `argparse`|
+|Configuración|Valores fijos dentro del notebook|`configs/config.yaml` centraliza rutas, semilla, `test_size`, features y parámetros del modelo|
+|Validación de datos|No había|`data/validation.py` valida columnas y variable objetivo con mensajes claros|
+|Fuga de información|Riesgo de incluir `casual` y `registered`|Se eliminan explícitamente (`leakage_columns` en config)|
+|Variables cíclicas|Manual o ausente|`hr` y `mnth` con seno/coseno; flag `is_rush_hour`|
+|Almacenamiento|`model_v1.joblib` + `metricas_v1.json` sueltos en `fase-1/`|`fase-2/models/model_v2.joblib` + `fase-2/reports/metrics_v2.json`, con un `Pipeline` completo (preprocesamiento + modelo)|
+|Rutas|Detectadas dentro del notebook|Resueltas por `config.py` a rutas absolutas desde la raíz del repo|
+|Tests|No había|10 tests con `pytest` (loader, validación, features, train/predict)|
+|Ejecución|Manual en Jupyter|CLI reproducible + imagen Docker|
 
-**Por qué cambia la partición.** En el dataset cada día aparece hasta 24 veces (una fila por hora) y esas filas se parecen mucho. Con una partición aleatoria, el modelo podía ver en entrenamiento horas vecinas de un día que luego se evaluaba en prueba, lo que hacía las métricas algo optimistas. Con la partición agrupada, el conjunto de prueba contiene **días completamente nuevos**. Las métricas son por ello algo menores que las de la Fase 1, pero más realistas. El baseline se evalúa con la misma partición.
-
-La estrategia de nulos, la selección de variables (exclusión de `casual` y `registered` por fuga de información, de `atemp` por colinealidad, y de `instant` y `dteday`) y los modelos se mantienen como en la Fase 1.
+**Partición train/test.** Se mantiene la partición aleatoria de la Fase 1 (`train_test_split` con `random_state` fijo) para conservar comparabilidad con las métricas ya reportadas. El preprocesamiento se ajusta **solo con `X_train`**, por lo que no hay fuga de información entre train y test.
 
 ## 3. Organización del código
 
 ```
 fase-2/
-├── train.py              # punto de entrada: entrena y guarda una versión
-├── predict.py            # punto de entrada: predice con una versión guardada
-├── requirements.txt      # 🚧
-├── Dockerfile            # 🚧
-├── .dockerignore         # 🚧
-├── pruebas.md            # evidencia de las pruebas manuales (capturas en img/)
-├── img/                  # capturas de pantalla de las pruebas manuales
+├── configs/
+│   └── config.yaml                # parámetros: rutas, semilla, test_size, features, modelo
 ├── src/
-│   ├── config.py         # constantes: variable objetivo y columnas
-│   ├── data.py           # lectura y validación de datos
-│   ├── preprocessing.py  # construcción del preprocesamiento
-│   ├── training.py       # partición, construcción y ajuste de modelos
-│   ├── evaluation.py     # métricas del modelo y del baseline
-│   ├── storage.py        # guardado y carga de versiones
-│   └── prediction.py     # validación y predicción sobre datos nuevos
-├── tests/                # 🚧 pruebas con pytest
-├── data/
-│   ├── processed/        # CSV con nulos inyectados (generado en la Fase 1)
-│   └── ejemplo_prediccion.csv
-├── models/               # versiones del modelo: v1/, v2/, ...
-└── outputs/              # predicciones generadas
+│   └── bike_demand/
+│       ├── __init__.py
+│       ├── config.py              # carga y resuelve rutas del YAML
+│       ├── data/
+│       │   ├── loader.py          # load_data()
+│       │   └── validation.py      # validate_schema(), validate_target()
+│       ├── features/
+│       │   └── build_features.py  # prepare_dataframe(), build_pipeline()
+│       ├── models/
+│       │   ├── train.py           # train_model()
+│       │   └── predict.py         # load_model(), predict()
+│       └── utils/
+│           └── metrics.py         # compute_metrics()
+├── scripts/
+│   ├── train.py                   # CLI de entrenamiento
+│   └── evaluate.py                # CLI de evaluación
+├── tests/
+│   ├── conftest.py                # expone src/ a pytest
+│   ├── test_data_loader.py
+│   ├── test_features.py
+│   └── test_model.py
+├── Dockerfile
+├── .dockerignore
+└── README.md
 ```
 
-**Principios de diseño**
+### Principios de diseño
 
-- `train.py` y `predict.py` son **orquestadores delgados**: solo reciben argumentos (`argparse`) y llaman, en orden, a funciones de `src/`. Toda la lógica vive en los módulos.
-- **Nada se ejecuta al importar** un módulo: la ejecución está dentro de `main()` y de `if __name__ == "__main__":`.
-- **No hay rutas absolutas, entradas interactivas ni dependencia de un notebook.** Las rutas llegan por argumentos.
-- **Las transformaciones no se duplican.** El preprocesamiento se define una sola vez (`build_preprocessor()`), forma parte del `Pipeline` y se guarda junto con el modelo. `predict.py` solo carga y predice: no reajusta nada.
+- `scripts/train.py` y `scripts/evaluate.py` son **orquestadores delgados**: solo parsean `--config` y llaman a funciones del paquete.
+- Nada se ejecuta al importar y que todo está dentro de `main()` y `if __name__ == "__main__":`.
+- No hay rutas absolutas hardcodeadas porque las rutas salen de `configs/config.yaml` y `config.py` las resuelve a absolutas desde la raíz del repo.
+- Las transformaciones no se duplican, ya que `prepare_dataframe()` se usa igual en entrenamiento y en evaluación, y el `Pipeline` (preprocesamiento + modelo) se guarda como un único artefacto.
 
-| Módulo | Responsabilidad | Funciones principales |
+### Módulos
+
+|Módulo|Responsabilidad|Funciones principales|
 |---|---|---|
-| `config.py` | Esquema de columnas único para todo el proyecto | `TARGET`, `GROUP_COL`, `NUM_COLS`, `CAT_COLS`, `FEATURE_COLS` |
-| `data.py` | Leer y validar datos; no transforma nada | `load_data`, `validate_columns`, `validate_numeric_types`, `validate_target`, `select_features` |
-| `preprocessing.py` | Construir el `ColumnTransformer` (sin ajustarlo) | `build_preprocessor` |
-| `training.py` | Partición agrupada y modelos | `split_data`, `build_model`, `fit_model` |
-| `evaluation.py` | MAE, RMSE y R²; comparación con el baseline | `compute_metrics`, `evaluate_models` |
-| `storage.py` | Versiones: guardar sin sobrescribir, cargar, metadatos | `save_version`, `load_version`, `build_metadata` |
-| `prediction.py` | Validar entrada, predecir y escribir resultados | `predict_dataframe`, `build_output`, `write_predictions` |
+|`config.py`|Cargar el YAML y resolver rutas|`load_config`|
+|`data/loader.py`|Leer el CSV crudo|`load_data`|
+|`data/validation.py`|Validar esquema y target|`validate_schema`, `validate_target`|
+|`features/build_features.py`|Encoding cíclico, flag rush hour, Pipeline|`add_cyclic_features`, `add_rush_hour_flag`, `prepare_dataframe`, `build_pipeline`|
+|`models/train.py`|Entrenamiento y persistencia|`train_model`|
+|`models/predict.py`|Carga e inferencia|`load_model`, `predict`|
+|`utils/metrics.py`|Métricas|`compute_metrics`|
 
 ## 4. Preprocesamiento y reglas de datos
 
-El preprocesamiento es un `ColumnTransformer` dentro de un `Pipeline`, y se ajusta **únicamente con el conjunto de entrenamiento**:
+El preprocesamiento es un `ColumnTransformer` con `StandardScaler` sobre las columnas numéricas resultantes de `prepare_dataframe()`, dentro de un `Pipeline` junto con el `RandomForestRegressor`. Se ajusta **únicamente con `X_train`**.
 
-| Tipo | Variables | Tratamiento |
-|---|---|---|
-| Numéricas | `temp`, `hum`, `windspeed` | Imputación por **mediana** + estandarización |
-| Categóricas | `season`, `weathersit`, `mnth`, `hr`, `weekday`, `yr`, `holiday`, `workingday` | Imputación por **moda** + one-hot |
+### Reglas aplicadas antes del Pipeline (`prepare_dataframe`)
 
-**Reglas al predecir** (se aplican con lo aprendido en el entrenamiento):
+- Se eliminan las columnas de fuga: `casual`, `registered`, `cnt`.
+- Se eliminan columnas sin valor predictivo: `instant`, `dteday`.
+- `hr` y `mnth` se codifican como seno/coseno (`hr_sin`, `hr_cos`, `mnth_sin`, `mnth_cos`).
+- Se añade `is_rush_hour` (1 si `hr ∈ {7, 8, 9, 17, 18, 19}` y `workingday == 1`).
 
-- **Valores nulos en una celda:** se imputan (mediana en numéricas, moda en categóricas). Un nulo **no** es un error.
-- **Columna requerida ausente:** error con mensaje claro y código de salida distinto de cero.
-- **Tipo de dato incompatible** (por ejemplo, texto en una columna numérica): error claro y código de salida distinto de cero.
-- **Columnas adicionales** (incluida `cnt` si viene en el CSV): se **ignoran**.
-- **Orden de las columnas del CSV:** no importa; se reordenan según el esquema guardado con la versión.
-- **Categorías no vistas en el entrenamiento** (por ejemplo, `weathersit=9`): no generan error; el one-hot las deja en ceros.
-- **Filas:** se devuelve exactamente una predicción por fila, en el mismo orden. No se eliminan observaciones.
+### Reglas al predecir
 
-**Limitación conocida:** no se validan los rangos de los valores (por ejemplo, `hr=30`); un valor fuera de rango se trata como categoría no vista.
+- **Valores nulos:** el Pipeline actual **no** incluye imputador, porque el dataset por defecto no tiene nulos. Si llegan nulos, la transformación falla (ver limitación abajo).
+- **Columna requerida ausente:** el `ColumnTransformer` falla al transformar y `predict()` propaga el error.
+- **Columnas adicionales** (incluida `cnt`): se eliminan en `prepare_dataframe()`.
+- **Orden de columnas:** no importa; `prepare_dataframe()` reordena y reconstruye.
+
+> **Limitación conocida:** el Pipeline no incluye `SimpleImputer` porque el dataset con nulos inyectados de la Fase 1 (`bike_share_with_nans.csv`) no se usa en el entrenamiento por defecto. Si se entrena con ese CSV, hay que añadir el imputador (mediana en numéricas) a `build_pipeline()`.
 
 ## 5. Datos
 
 - **Fuente original:** [Bike Sharing Dataset (Kaggle)](https://www.kaggle.com/datasets/amil09/bike-sharing-dataset/data?select=Bike+Share+hourly.csv).
-- **Archivo utilizado:** el dataset original no contiene valores nulos, por lo que se usa el archivo generado en la Fase 1, que ya incluye los nulos inyectados. Se llama `bike_share_with_nans.csv` y está en `fase-2/data/processed/`. Se incluye en el repositorio, por lo que **no es necesario descargar nada de Kaggle** para entrenar.
-- **Datos con nulos inyectados:** la Fase 1 inyectó valores faltantes MCAR (1,2 % en `hum` y 1,7 % en `windspeed`, semilla 42) en el notebook `fase-1/notebooks/01_modelo_predictivo.ipynb` (sección de inyección MCAR).
+- **Archivo usado por defecto:** `data/raw/bike_share_hourly.csv` (dataset original, sin nulos). Ruta definida en `configs/config.yaml`.
+- **Archivo procesado de la Fase 1:** `data/processed/bike_share_with_nans.csv` (nulos MCAR inyectados con semilla 42). Disponible en el repo; **no** se usa por defecto.
+- **No es necesario descargar nada de Kaggle** para entrenar: el CSV está versionado en el repositorio.
 
-### Esquema del CSV de predicción
+### Esquema del CSV de entrada
 
-La variable objetivo **no** es necesaria. Se incluye un ejemplo en `data/ejemplo_prediccion.csv` (10 filas, dos de ellas con nulos en `hum` y `windspeed`).
+El dataset original tiene 17 columnas: `instant`, `dteday`, `season`, `yr`, `mnth`, `hr`, `holiday`, `weekday`, `workingday`, `weathersit`, `temp`, `atemp`, `hum`, `windspeed`, `casual`, `registered`, `cnt`. El entrenamiento usa todas excepto las eliminadas en `prepare_dataframe()`.
 
-| Columna | Descripción | Valores |
-|---|---|---|
-| `temp` | Temperatura normalizada | 0 a 1 |
-| `hum` | Humedad normalizada (admite nulos) | 0 a 1 |
-| `windspeed` | Velocidad del viento normalizada (admite nulos) | 0 a 1 |
-| `season` | Estación | 1 a 4 |
-| `weathersit` | Situación climática | 1 a 4 |
-| `mnth` | Mes | 1 a 12 |
-| `hr` | Hora del día | 0 a 23 |
-| `weekday` | Día de la semana | 0 a 6 |
-| `yr` | Año (0 = 2011, 1 = 2012) | 0 o 1 |
-| `holiday` | Día festivo | 0 o 1 |
-| `workingday` | Día laboral | 0 o 1 |
+### Salida de `evaluate.py` y `metrics_v2.json`
 
-### Salida de `predict.py`
-
-CSV con dos columnas (más una opcional con `--id-col`):
-
-- `fila`: posición de la fila en el CSV de entrada (desde 1).
-- `prediccion`: **número estimado de bicicletas alquiladas en esa hora** (regresión; no hay etiquetas de clase).
+JSON con tres claves: `mae`, `rmse`, `r2`.
 
 ## 6. Ejecución local
 
-Terminal utilizada: **PowerShell** (Windows). Todos los comandos se ejecutan desde la carpeta `fase-2`.
+Terminal utilizada: **bash** en Linux / **PowerShell** en Windows. Todos los comandos se ejecutan desde la **raíz del repositorio** (`modelos1-price-prediction/`), porque las rutas de `config.yaml` son relativas a la raíz.
 
-🚧 *Versión de Python, creación del entorno e instalación de dependencias: se completa al fijar `requirements.txt`.*
+### 6.1 Entorno
 
-### Entrenamiento
+**Linux (bash)**
 
-```powershell
-python train.py --data data/processed/bike_share_with_nans.csv --target cnt --output-dir models --version v1 --seed 42
+```bash
+python3 --version          # probado con Python 3.11 y 3.14
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-| Argumento | Descripción | Por defecto |
-|---|---|---|
-| `--data` | CSV con datos etiquetados | obligatorio |
-| `--target` | Variable objetivo | `cnt` |
-| `--output-dir` | Directorio donde se guardan las versiones | `models` |
-| `--version` | Identificador de la versión (no se sobrescribe si ya existe) | obligatorio |
-| `--seed` | Semilla aleatoria | `42` |
-| `--test-size` | Proporción de días para prueba | `0.2` |
-| `--n-estimators` | Número de árboles del Random Forest | `200` |
-| `--min-samples-leaf` | Mínimo de muestras por hoja del Random Forest | `1` |
-
-### Predicción
+**Windows (PowerShell)**
 
 ```powershell
-python predict.py --model models/v1/modelo.joblib --input data/ejemplo_prediccion.csv --output outputs/predicciones.csv
+python --version
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
-`--model` acepta la ruta a `modelo.joblib` o la carpeta de la versión (`models/v1`). Con `--id-col` se copia una columna del CSV de entrada como identificador en la salida.
+> Si PowerShell bloquea la activación del entorno, ejecuta una vez `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` y vuelve a intentarlo.
 
-### Ayuda
+### 6.2 Entrenamiento
+
+**Linux (bash)**
+
+```bash
+python fase-2/scripts/train.py --config fase-2/configs/config.yaml
+```
+
+**Windows (PowerShell)**
 
 ```powershell
-python train.py --help
-python predict.py --help
+python fase-2\scripts\train.py --config fase-2\configs\config.yaml
 ```
+
+Salida esperada (ver [§8](#8-resultados)):
+
+```
+Entrenamiento completado. Métricas en test:
+  mae: 24.5983
+  rmse: 40.2846
+  r2: 0.9488
+```
+
+Genera:
+
+- `fase-2/models/model_v2.joblib` (Pipeline completo)
+- `fase-2/reports/metrics_v2.json`
+
+### 6.3 Evaluación
+
+**Linux (bash)**
+
+```bash
+python fase-2/scripts/evaluate.py --config fase-2/configs/config.yaml
+```
+
+**Windows (PowerShell)**
+
+```powershell
+python fase-2\scripts\evaluate.py --config fase-2\configs\config.yaml
+```
+
+Salida esperada: el mismo JSON con `mae`, `rmse` y `r2` que `metrics_v2.json`. Como `evaluate.py` reusa el mismo `random_state` y el mismo split, los valores coinciden al decimal con los del entrenamiento.
+
+### 6.4 Inferencia sobre datos nuevos
+
+`predict()` está expuesto como función del paquete. Ejemplo mínimo:
+
+**Linux (bash)**
+
+```bash
+python -c "
+import sys; sys.path.insert(0, 'fase-2/src')
+from bike_demand.config import load_config
+from bike_demand.data.loader import load_data
+from bike_demand.models.predict import predict
+cfg = load_config('fase-2/configs/config.yaml')
+df = load_data(cfg['data']['raw_path'])
+print(predict(df.head(3), cfg))
+"
+```
+
+**Windows (PowerShell)**
+
+```powershell
+python -c @"
+import sys; sys.path.insert(0, 'fase-2/src')
+from bike_demand.config import load_config
+from bike_demand.data.loader import load_data
+from bike_demand.models.predict import predict
+cfg = load_config('fase-2/configs/config.yaml')
+df = load_data(cfg['data']['raw_path'])
+print(predict(df.head(3), cfg))
+"@
+```
+
+Salida esperada (valores de la ejecución de referencia):
+
+```
+0    25.697872
+1    34.503190
+2    27.089444
+```
+
+### 6.5 Tests
+
+**Linux (bash)**
+
+```bash
+pytest fase-2/tests/ -v
+```
+
+**Windows (PowerShell)**
+
+```powershell
+pytest fase-2\tests\ -v
+```
+
+Deben pasar los 10 tests. Ver [§10.1](#101-pruebas-automatizadas-con-pytest).
 
 ## 7. Versiones del modelo
 
-Cada ejecución de `train.py` crea una carpeta nueva dentro de `models/`. Una versión existente **nunca se sobrescribe**: si el identificador ya existe, el script termina con un error antes de entrenar.
+Cada ejecución de `train.py` escribe en las rutas definidas en `config.yaml` (`output.model_path` y `output.metrics_path`). En la rama actual **no hay versionado por carpeta**: `model_v2.joblib` y `metrics_v2.json` se sobrescriben en cada ejecución. Si se necesita histórico, se cambia `output.model_path` en el YAML y se vuelve a ejecutar.
+
+### Versión entregada
+
+- `fase-2/models/model_v2.joblib` — Pipeline `ColumnTransformer(StandardScaler) + RandomForestRegressor`
+- `fase-2/reports/metrics_v2.json` — métricas de la ejecución de referencia
+
+### Artefactos generados
 
 ```
-models/
-└── v1/
-    ├── modelo.joblib     # pipeline completo: preprocesamiento + modelo
-    ├── metrics.json      # métricas del modelo y del baseline (train y test)
-    └── metadata.json     # versión, fecha, datos, partición, variables, entorno y commit
+fase-2/
+├── models/
+│   └── model_v2.joblib     # ~67 MB; ignorado por .gitignore
+└── reports/
+    └── metrics_v2.json     # ignorado por .gitignore
 ```
-
-🚧 *Se documentarán aquí las versiones `v1` y `v2` entregadas y sus diferencias.*
 
 ## 8. Resultados
 
-Métricas en el conjunto de prueba (días no vistos), partición agrupada por día, semilla 42. Valores **provisionales** de una ejecución de verificación; se actualizarán con la versión `v1` entregada.
+Métricas en el conjunto de prueba, semilla 42 (`train_test_split` con `test_size=0.2`).
 
-| Modelo | MAE | RMSE | R² |
+|Modelo|MAE|RMSE|R²|
 |---|---|---|---|
-| Baseline (Ridge) | 72,68 | 97,84 | 0,693 |
-| Random Forest | 31,93 | 51,64 | 0,914 |
+|Random Forest (Fase 2)|24.5983|40.2846|0.9488|
 
-El Random Forest reduce el MAE en ≈ 56 % y el RMSE en ≈ 47 % frente al baseline.
+**Referencia de la Fase 1** (partición aleatoria, notebook): MAE ≈ 24.6, RMSE ≈ 40.3, R² ≈ 0.949. Las métricas de la Fase 2 son consistentes con las de la Fase 1 porque la partición y las features se mantienen.
 
-**Limitaciones conocidas**
+### Limitaciones conocidas
 
-- **Sobreajuste moderado:** R² de 0,990 en entrenamiento frente a 0,914 en prueba.
-- El modelo se equivoca más en horas pico, con mal clima y en fines de semana (según el análisis de la Fase 1).
-- No se validan rangos de los valores de entrada.
-- El Random Forest es no determinista por naturaleza; se fija `random_state` con la semilla indicada para obtener resultados consistentes en el mismo entorno.
+- No se valida el rango de los valores de entrada (p. ej. `hr=30` se trata como valor numérico y produce predicciones sin sentido).
+- El `Pipeline` no incluye `SimpleImputer`; si se entrena con `bike_share_with_nans.csv`, fallará al encontrar nulos.
+- El Random Forest es no determinista por naturaleza; se fija `random_state` con la semilla de `config.yaml` para obtener resultados consistentes en el mismo entorno.
+- El `.joblib` pesa ~67 MB y no se versiona. Se regenera con `train.py`.
 
-## 9. 🚧 Docker
+## 9. Docker
 
-*Pendiente: comandos de construcción y ejecución con montajes de carpetas.*
+La imagen empaqueta el código de la Fase 2 y ejecuta el entrenamiento. Los datos y artefactos se montan como volúmenes; no se copian dentro de la imagen.
+
+### 9.1 Instalación de Docker
+
+**Linux (Ubuntu/Debian, Fedora, Arch)**
+
+- **Ubuntu/Debian:** sigue la instalación oficial desde el repositorio de Docker. Los pasos resumidos son: añadir la clave GPG, agregar el repositorio y ejecutar `sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin`.
+- **Fedora:** `sudo dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin` (tras añadir el repositorio oficial de Docker).
+- **Arch Linux:** `sudo pacman -S docker docker-buildx` y luego `sudo systemctl enable --now docker`.
+
+Tras instalar, verifica con `sudo docker run hello-world`. Si quieres usar `docker` sin `sudo`, añade tu usuario al grupo `docker` y reinicia la sesión:
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+> El grupo `docker` da privilegios equivalentes a root; úsalo solo en tu máquina de desarrollo.
+
+**Windows**
+
+Instala **Docker Desktop para Windows** desde la página oficial. Durante la instalación, asegúrate de que la opción **"Use WSL 2 based engine"** esté marcada. Si WSL 2 no está configurado, abre PowerShell como administrador, ejecuta `wsl --install` y reinicia el equipo. Al terminar, inicia Docker Desktop desde el menú de inicio y espera a que el icono de la ballena esté estable. Verifica en PowerShell con `docker run hello-world`.
+
+### 9.2 Construcción
+
+Desde la **raíz del repositorio**:
+
+**Linux (bash)**
+
+```bash
+docker build -f fase-2/Dockerfile -t bike-demand-fase2 .
+```
+
+**Windows (PowerShell)**
+
+```powershell
+docker build -f fase-2\Dockerfile -t bike-demand-fase2 .
+```
+
+### 9.3 Entrenamiento en contenedor
+
+`config.py` resuelve las rutas relativas contra la raíz del repositorio dentro del contenedor (`/app`). Por eso los volúmenes se montan en `/app/data`, `/app/models` y `/app/reports`, **no** dentro de `fase-2/`.
+
+**Linux (bash)**
+
+```bash
+docker run --rm \
+  -v "$(pwd)/data:/app/data:ro" \
+  -v "$(pwd)/fase-2/models:/app/models" \
+  -v "$(pwd)/fase-2/reports:/app/reports" \
+  bike-demand-fase2
+```
+
+**Windows (PowerShell)**
+
+```powershell
+docker run --rm `
+  -v "${PWD}/data:/app/data:ro" `
+  -v "${PWD}/fase-2/models:/app/models" `
+  -v "${PWD}/fase-2/reports:/app/reports" `
+  bike-demand-fase2
+```
+
+Salida esperada: las mismas métricas de la [§8](#8-resultados). Los archivos `model_v2.joblib` y `metrics_v2.json` aparecen en `fase-2/models/` y `fase-2/reports/` de tu máquina.
+
+### 9.4 Tests dentro del contenedor
+
+**Linux (bash)**
+
+```bash
+docker run --rm \
+  -v "$(pwd)/data:/app/data:ro" \
+  bike-demand-fase2 \
+  python -m pytest tests/ -v
+```
+
+**Windows (PowerShell)**
+
+```powershell
+docker run --rm `
+  -v "${PWD}/data:/app/data:ro" `
+  bike-demand-fase2 `
+  python -m pytest tests/ -v
+```
+
+### 9.5 Notas
+
+- `.dockerignore` excluye `data/`, `models/`, `reports/`, `__pycache__/`, `.pytest_cache/` y `.git/`.
+- El `Dockerfile` copia `requirements.txt` primero para aprovechar la caché de capas, y define `PYTHONPATH=/app/fase-2/src` para que `scripts/train.py` importe `bike_demand` sin variables adicionales.
+- Si ejecutas Docker con `sudo` en Linux, los archivos generados en los volúmenes pertenecerán a `root`. Puedes cambiar el propietario con `sudo chown -R $USER:$USER fase-2/models fase-2/reports`.
+- En Windows, si usas Git Bash en lugar de PowerShell, las rutas con `$(pwd)` pueden fallar por la conversión automática de rutas de MSYS. Usa PowerShell o define `MSYS_NO_PATHCONV=1`.
 
 ## 10. Pruebas
 
-### 10.1 Pruebas manuales de `train.py` y `predict.py`
+### 10.1 Pruebas automatizadas con pytest
 
-Se ejecutaron a mano los casos normales y los errores previsibles de ambos scripts. El detalle y las capturas completas están en [`pruebas.md`](pruebas.md). Resumen:
+**Linux (bash)**
 
-| # | Prueba | Resultado esperado | Evidencia |
-|---|---|---|---|
-| 1 | Importar `train` y `predict` (`python -c "import train"`, `python -c "import predict"`) y consultar `--help` en ambos | No se ejecuta nada al importar; `--help` lista los argumentos de cada script | [1](img/1.PNG), [2](img/2.PNG) |
-| 2 | **`train.py`**: ejecución con ruta de datos, variable objetivo, directorio de salida, versión, semilla y parámetros de partición | Resumen de métricas (modelo y baseline) y rutas de los archivos generados | [3](img/3.PNG) |
-| 3 | **`train.py`**: estructura de la versión creada | `models/<versión>/` con `modelo.joblib`, `metrics.json` y `metadata.json` | [4](img/4.PNG) |
-| 4 | **`train.py`**: contenido de `metadata.json` | Versión, fecha, tipo de problema, objetivo, algoritmo, variables y tipos, parámetros y semilla, datos usados, partición, versión de Python y hash del commit | [6](img/6.PNG), [7](img/7.PNG), [8](img/8.PNG) |
-| 5 | **`train.py`**: identificador de versión repetido | `ERROR` claro, código de salida distinto de cero; la versión existente no se modifica | [9](img/9.PNG) |
-| 6 | **`train.py`**: archivo de datos inexistente | `ERROR` claro y código de salida distinto de cero | [10](img/10.PNG) |
-| 7 | **`train.py`**: variable objetivo inexistente | `ERROR` claro y código de salida distinto de cero | [11](img/11.PNG) |
-| 8 | **`predict.py`**: ejecución con ruta del modelo, CSV de entrada (sin variable objetivo) y CSV de salida | Se genera el CSV con `fila` y `prediccion`, una fila por cada fila de entrada | [12](img/12.PNG), [13](img/13.PNG) |
-| 9 | **`predict.py`**: modelo inexistente | `ERROR` claro y código de salida distinto de cero | [14](img/14.PNG) |
-| 10 | **`predict.py`**: columna requerida ausente en el CSV de entrada | `ERROR` que indica la columna faltante; no se crea el archivo de salida | [15](img/15.PNG) |
-| 11 | **`predict.py`**: tipo de dato incompatible (texto en una columna numérica) | `ERROR` que indica la columna y el tipo; no se crea el archivo de salida | [16](img/16.PNG) |
+```bash
+pytest fase-2/tests/ -v
+```
 
-> Pendientes de evidenciar: reordenamiento de columnas del CSV de entrada, columnas adicionales (por ejemplo `cnt`) y selección explícita entre dos versiones (`v1` y `v2`).
+**Windows (PowerShell)**
 
-### 10.2 🚧 Pruebas automatizadas con pytest
+```powershell
+pytest fase-2\tests\ -v
+```
 
-*Pendiente: comando `python -m pytest` y descripción de las pruebas.*
+Resultado esperado:
 
-## 11. 🚧 Identificación de la entrega y fuentes
+```
+collected 10 items
+test_data_loader.py::test_validate_schema_ok PASSED
+test_data_loader.py::test_validate_schema_missing_column PASSED
+test_data_loader.py::test_validate_target_ok PASSED
+test_data_loader.py::test_validate_target_with_nan PASSED
+test_data_loader.py::test_load_data_missing_file PASSED
+test_features.py::test_add_cyclic_features PASSED
+test_features.py::test_add_rush_hour_flag PASSED
+test_features.py::test_prepare_dataframe_drops_leakage PASSED
+test_model.py::test_train_model_creates_artifacts PASSED
+test_model.py::test_predict_returns_series PASSED
+===== 10 passed =====
+```
 
-- **Commit o etiqueta de la Entrega 2:** *pendiente (se sugiere la etiqueta `entrega-2`).*
-- **Fuentes consultadas y código externo adaptado:** *pendiente.*
+Cobertura de los tests:
+
+|Archivo|Tests|Qué comprueba|
+|---|---|---|
+|`test_data_loader.py`|5|Esquema válido, esquema con columna faltante, target válido, target con nulos, archivo inexistente|
+|`test_features.py`|3|Encoding cíclico, flag rush hour, eliminación de columnas con fuga|
+|`test_model.py`|2|Entrenamiento con dataset sintético de 200 filas (`tmp_path`); la inferencia devuelve una `Series` de longitud correcta|
+
+Los tests de `test_model.py` no dependen de `data/raw/` ni del modelo ya entrenado: crean un CSV sintético en `tmp_path` y ejecutan el pipeline completo.
+
+### 10.2 Pruebas manuales de `train.py` y `evaluate.py`
+
+|#|Prueba|Resultado esperado|
+|---|---|---|
+|1|`train.py --config fase-2/configs/config.yaml`|Métricas MAE/RMSE/R² y creación de `model_v2.joblib` y `metrics_v2.json`|
+|2|`evaluate.py --config fase-2/configs/config.yaml`|Las mismas métricas que `train.py`, al decimal|
+|3|`pytest fase-2/tests/ -v`|10 tests en verde|
+|4|Inferencia con `python -c "..."` ([§6.4](#64-inferencia-sobre-datos-nuevos))|3 predicciones no negativas|
+|5|`docker build ...` y `docker run ...` ([§9](#9-docker))|Métricas dentro del contenedor iguales a las locales|
+
+Las capturas de pantalla de las pruebas manuales se mantienen en `fase-2/img/`.
+
+## 11. Fuentes consultadas y código externo adaptado
+
+- **Dataset original:** [Bike Sharing Dataset (Kaggle)](https://www.kaggle.com/datasets/amil09/bike-sharing-dataset/data?select=Bike+Share+hourly.csv). Licencia de uso según Kaggle.
+- **scikit-learn:** `Pipeline`, `ColumnTransformer`, `StandardScaler`, `RandomForestRegressor`, `train_test_split`, `mean_absolute_error`, `mean_squared_error`, `r2_score`. Documentación: [https://scikit-learn.org/stable/](https://scikit-learn.org/stable/).
+- **joblib:** serialización de artefactos. Documentación: [https://joblib.readthedocs.io/](https://joblib.readthedocs.io/).
+- **pytest:** ejecución de tests y fixture `tmp_path`. Documentación: [https://docs.pytest.org/](https://docs.pytest.org/).
+- **PyYAML:** lectura de `config.yaml`. Documentación: [https://pyyaml.org/wiki/PyYAMLDocumentation](https://pyyaml.org/wiki/PyYAMLDocumentation).
+- **Docker:** imagen `python:3.12-slim` y volúmenes bind-mount. Documentación: [https://docs.docker.com/](https://docs.docker.com/).

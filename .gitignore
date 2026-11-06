@@ -63,3 +63,5 @@ tmp/
 fase-2/models/
 fase-2/reports/
 *.joblib
+
+fase-2/checklist.md

@@ -58,8 +58,13 @@ tmp/
 *.log
 
 # ============================================================
-# Artefactos de ML generados (Fase 2)
+# Artefactos temporales de ML (Fase 2)
 # ============================================================
-fase-2/models/
-fase-2/reports/
-*.joblib
+
+# Modelos de prueba y ejecuciones temporales
+fase-2/models/v4/
+fase-2/models/v5/
+fase-2/models/docker-v1/
+
+# Archivos temporales de evaluación
+fase-2/reports/tmp/

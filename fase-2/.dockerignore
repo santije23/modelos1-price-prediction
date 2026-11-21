@@ -1,7 +1,6 @@
-data/
-models/
-reports/
-__pycache__/
-*.pyc
+.venv/
+**/__pycache__/
+**/*.pyc
 .git/
 .pytest_cache/
+**/.ipynb_checkpoints/

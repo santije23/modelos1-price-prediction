@@ -1,43 +1,69 @@
-"""Carga y validación de la configuración del proyecto."""
+"""Carga YAML y resuelve rutas desde la raíz del repositorio."""
 
 from pathlib import Path
-from typing import Any, Dict
-
+from typing import Any
 import yaml
 
 
-def load_config(config_path: str | Path) -> Dict[str, Any]:
-    """Carga el YAML de configuración y resuelve rutas relativas a la raíz del repo.
+def find_repo_root(config_path: Path) -> Path:
+    """Localiza la raíz del repositorio a partir de la configuración."""
+    for parent in config_path.parents:
+        if (parent / "fase-1").is_dir() and (parent / "data").is_dir():
+            return parent
 
-    Args:
-        config_path: Ruta al archivo YAML de configuración.
+    raise FileNotFoundError(
+        "No se pudo identificar la raíz del repositorio. "
+        "Se esperaban las carpetas 'fase-1/' y 'data/'."
+    )
 
-    Returns:
-        Diccionario con la configuración.
 
-    Raises:
-        FileNotFoundError: Si el archivo no existe.
-        ValueError: Si falta alguna clave requerida.
-    """
-    config_path = Path(config_path).resolve()
-    if not config_path.exists():
-        raise FileNotFoundError(f"No se encontró el archivo de configuración: {config_path}")
+def load_config(config_path: str | Path) -> dict[str, Any]:
+    """Carga y valida la configuración YAML."""
+    path = Path(config_path).resolve()
 
-    with open(config_path, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"No se encontró el archivo de configuración: {path}"
+        )
 
-    required_keys = ["data", "features", "model", "output"]
-    for key in required_keys:
-        if key not in config:
-            raise ValueError(f"Falta la clave requerida en config: '{key}'")
+    with path.open("r", encoding="utf-8") as file:
+        config = yaml.safe_load(file)
 
-    # Resolver rutas relativas a la raíz del repositorio (dos niveles arriba de configs/)
-    repo_root = config_path.parent.parent.parent
-    config["_repo_root"] = str(repo_root)
-    for section, key in [("data", "raw_path"), ("data", "processed_path"),
-                         ("output", "model_path"), ("output", "metrics_path")]:
-        raw = config[section][key]
-        if not Path(raw).is_absolute():
-            config[section][key] = str(repo_root / raw)
+    if not isinstance(config, dict):
+        raise ValueError("La configuración YAML debe contener un objeto.")
+
+    required_sections = (
+        "project",
+        "data",
+        "features",
+        "model",
+        "output",
+    )
+
+    for section in required_sections:
+        if section not in config:
+            raise ValueError(
+                f"Falta la sección requerida en config: '{section}'"
+            )
+
+    root = find_repo_root(path)
+    config["_repo_root"] = str(root)
+
+    # Resolver rutas relativas desde la raíz del repositorio.
+    for section, key in (
+        ("data", "raw_path"),
+        ("output", "models_dir"),
+    ):
+        if key not in config[section]:
+            raise ValueError(
+                f"Falta '{key}' en la sección '{section}'."
+            )
+
+        value = Path(config[section][key])
+
+        if not value.is_absolute():
+            value = root / value
+
+        config[section][key] = str(value.resolve())
 
     return config

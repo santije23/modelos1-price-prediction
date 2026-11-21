@@ -1,0 +1,9 @@
+{
+  "version": "v1",
+  "problem_type": "regression",
+  "mae": 26.95112109800507,
+  "rmse": 45.19643807695587,
+  "r2": 0.9344626819106555,
+  "train_rows": 13893,
+  "test_rows": 3486
+}

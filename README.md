@@ -120,24 +120,52 @@ Con estos cambios, el desempeño en prueba pasó de un MAE de 29,34 y un R² de 
 .
 ├── data/
 │   ├── raw/
-│   │   └── bike_share_hourly.csv                # Dataset original (incluido en el repositorio)
-│   └── processed/
-│       └── bike_share_with_nans.csv          # Generado por el notebook
+│   │   └── bike_share_hourly.csv             # Dataset original (incluido en el repositorio)
+│   ├── processed/
+│   │   └── bike_share_with_nans.csv          # Generado por el notebook
+│   └── example_prediction.csv                # Filas de ejemplo para predecir (fases 2 y 3)
 ├── fase-1/
 │   ├── notebooks/
-│   │   └── 01_modelo_predictivo.ipynb   # Notebook principal
+│   │   └── 01_modelo_predictivo.ipynb        # Notebook principal
 │   ├── models/
-│   │   └── model_v1.joblib                            # Generado por el notebook
+│   │   └── model_v1.joblib                   # Generado por el notebook
 │   └── reports/
-│       ├── metricas_v1.json                            # Generado por el notebook
-│       └── figures/                                             # Gráficas generadas por el notebook
-├── fase-2/                                       # Scripts de entrenamiento/predicción versionados y Docker
-│   ├── configs/  models/v1  models/v2  scripts/  src/bike_demand/  tests/
+│       ├── metricas_v1.json                  # Generado por el notebook
+│       └── figures/                          # Gráficas generadas por el notebook
+├── fase-2/                                   # Scripts de entrenamiento/predicción versionados y Docker
+│   ├── configs/
+│   │   ├── config.yaml                       # Configuración de la versión v1
+│   │   └── versions/v2.yaml                  # Configuración de la versión v2
+│   ├── models/                               # Versiones del modelo (modelo.joblib, metrics.json, metadata.json)
+│   │   ├── docker-v1/                        # Versión entrenada dentro de Docker
+│   │   ├── v1/
+│   │   └── v2/
+│   ├── outputs/                              # Predicciones generadas (local y Docker)
+│   ├── scripts/                              # train.py, evaluate.py, predict.py
+│   ├── src/bike_demand/                      # Paquete: datos, features, modelos y métricas
+│   ├── tests/                                # Pruebas de la fase 2 (pytest)
+│   ├── img/                                  # Capturas de la ejecución
+│   ├── Dockerfile
 │   └── README.md
-├── fase-3/                                       # API REST (FastAPI): /health, /predict, /train
+├── fase-3/                                   # API REST (FastAPI): /health, /predict, /train
+│   ├── api/                                  # main.py, schemas.py, settings.py, server.py
+│   ├── configs/api.yaml                      # Versión activa del modelo y configuración de /train
+│   ├── client/                               # Cliente de Python y colección de Postman
+│   ├── tests/                                # Pruebas de la API (pytest)
+│   ├── requirements.txt
+│   ├── Dockerfile
 │   └── README.md
-├── fase-4/                                       # Registro de solicitudes y métricas de operación
+├── fase-4/                                   # Registro de solicitudes y métricas de operación
+│   ├── app.py                                # API de la fase 3 con el registro habilitado
+│   ├── monitoring/                           # logger.py: una fila por llamada a /predict
+│   ├── scripts/                              # monitor.py: total de solicitudes y % de fallos
+│   ├── logs/
+│   │   └── sample_predictions_log.csv        # Muestra del registro entregada con el reporte
+│   ├── tests/                                # Pruebas del monitoreo (pytest)
+│   ├── Dockerfile
 │   └── README.md
+├── .dockerignore
+├── .gitignore
 ├── requirements.txt
 └── README.md
 ```

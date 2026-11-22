@@ -45,6 +45,14 @@ URL base: `http://localhost:8000`
 | `POST` | `/train` | vacío | `201` | Entrena con los datos y la configuración de la fase 2 y guarda una versión nueva. |
 | `GET` | `/docs` | — | `200` | Documentación interactiva (Swagger UI) para probar los endpoints desde el navegador. |
 
+El método de cada ruta es fijo: `/predict` y `/train` solo aceptan `POST`. Si se usa otro método (por ejemplo `GET`, que es el que usan por defecto el navegador y Postman), la respuesta es `405`:
+
+```json
+{"detail": "El método GET no está permitido en /predict. Use POST."}
+```
+
+Las rutas aceptan la URL con o sin barra final (`/predict` y `/predict/` son equivalentes).
+
 ### `GET /health`
 
 Respuesta `200`:
@@ -89,6 +97,7 @@ Respuestas de error:
 | `422` | Tipo incompatible (texto) | `{"detail": "Valor inválido en 'hr': Input should be a valid number.", ...}` |
 | `422` | Valor fuera de rango | `{"detail": "Valor inválido en 'hr': Input should be less than or equal to 23.", ...}` |
 | `422` | El cuerpo no es JSON | `{"detail": "El cuerpo no es un JSON válido.", ...}` |
+| `405` | Se usó un método distinto de `POST` | `{"detail": "El método GET no está permitido en /predict. Use POST."}` |
 | `503` | La versión configurada no existe o no se puede cargar | `{"detail": "El modelo 'v9' no está disponible en /app/fase-2/models/v9: ..."}` |
 
 ### `POST /train`
@@ -221,9 +230,12 @@ Para que las versiones creadas con `/train` registren el commit en su `metadata.
 
 ### Paso 4. Iniciar el contenedor
 
+Las fases 3 y 4 usan **un único contenedor**, llamado `bike-api`. Antes de iniciarlo se elimina cualquier contenedor anterior con ese nombre, sea de la fase 3 o de la fase 4 y esté en el puerto que esté. Si no existía, Docker responde `No such container` y se continúa normalmente.
+
 **Windows (PowerShell):**
 
 ```powershell
+docker rm -f bike-api
 docker run -d --rm -p 8000:8000 `
   -v "${PWD}/fase-2/models:/app/fase-2/models" `
   -v "${PWD}/data:/app/data:ro" `
@@ -233,6 +245,7 @@ docker run -d --rm -p 8000:8000 `
 **Linux:**
 
 ```bash
+docker rm -f bike-api
 docker run -d --rm -p 8000:8000 \
   --user "$(id -u):$(id -g)" \
   -v "$PWD/fase-2/models:/app/fase-2/models" \
@@ -249,7 +262,7 @@ Qué significa cada opción:
 | `-p 8000:8000` | Publica el puerto. El servidor escucha en `0.0.0.0:8000` dentro del contenedor y queda accesible en `http://localhost:8000`. |
 | `-v .../fase-2/models:/app/fase-2/models` | **Montaje de modelos.** La API lee `v1` y `v2` de esa carpeta del equipo, y `/train` escribe ahí las versiones nuevas, que permanecen al cerrar el contenedor. |
 | `-v .../data:/app/data:ro` | **Acceso a los datos** (solo lectura). `/train` lee `data/processed/bike_share_with_nans.csv`. |
-| `--name bike-api` | Nombre del contenedor, para detenerlo o ver sus registros. |
+| `--name bike-api` | Nombre del contenedor, el mismo en las fases 3 y 4. Docker no permite dos contenedores con el mismo nombre, así que nunca quedan dos copias de la API, aunque se publiquen en puertos diferentes. |
 | `--user` (Linux) | Hace que los archivos creados por `/train` pertenezcan a su usuario y no a root. |
 
 ### Paso 5. Comprobar que arrancó
@@ -326,12 +339,30 @@ El repositorio incluye la colección `fase-3/client/bike_demand_api.postman_coll
 
 **Crear la solicitud a mano** (sin importar la colección):
 
-1. **New → HTTP Request**.
-2. Método **POST** y URL `http://localhost:8000/predict`.
-3. Pestaña **Body** → **raw** → tipo **JSON**, y pegue el JSON de la [sección 1](#post-predict).
-4. Pulse **Send**.
+1. Pulse **New → HTTP** (o el botón **+** de las pestañas). Se abre una solicitud nueva con el método **GET**, que es el predeterminado de Postman.
+2. **Cambie el método a POST**: haga clic en el desplegable que dice `GET`, a la izquierda de la barra de URL, y elija `POST`. Si se deja en `GET`, la API responde `405` con `El método GET no está permitido en /predict. Use POST.`
+3. Escriba la URL `http://localhost:8000/predict`.
+4. Abra la pestaña **Body** (debajo de la URL), marque **raw** y, en el desplegable de la derecha que dice `Text`, elija **JSON**.
+5. Pegue el cuerpo:
 
-Postman añade automáticamente la cabecera `Content-Type: application/json` al elegir *raw → JSON*.
+   ```json
+   {
+     "season": 1, "yr": 1, "mnth": 6, "hr": 8, "holiday": 0, "weekday": 1,
+     "workingday": 1, "weathersit": 1, "temp": 0.55, "hum": 0.65, "windspeed": 0.20
+   }
+   ```
+
+6. Pulse **Send**. Abajo debe aparecer `Status: 200 OK` y `{"prediccion": 592.6558988095239, "version": "v2"}`.
+
+Al elegir *raw → JSON*, Postman añade la cabecera `Content-Type: application/json`; se puede comprobar en la pestaña **Headers**.
+
+Para las demás rutas se procede igual:
+
+| Ruta | Método | Body |
+|---|---|---|
+| `http://localhost:8000/health` | `GET` | ninguno (*none*) |
+| `http://localhost:8000/predict` | `POST` | *raw → JSON* con las 11 variables |
+| `http://localhost:8000/train` | `POST` | ninguno (*none*) |
 
 ### 6.3. Con el cliente de Python
 
@@ -492,6 +523,8 @@ docker run --rm bike-demand-api python -m pytest -v tests/
 ```text
 tests/test_api.py::test_health_returns_200 PASSED
 tests/test_api.py::test_valid_record_returns_prediction_and_version PASSED
+tests/test_api.py::test_trailing_slash_is_accepted PASSED
+tests/test_api.py::test_wrong_method_explains_allowed_method PASSED
 tests/test_api.py::test_missing_required_field_is_rejected PASSED
 tests/test_api.py::test_null_value_is_imputed PASSED
 tests/test_api.py::test_incompatible_type_is_rejected PASSED
@@ -499,7 +532,7 @@ tests/test_api.py::test_out_of_range_value_is_rejected PASSED
 tests/test_api.py::test_unavailable_model_returns_503 PASSED
 tests/test_api.py::test_train_creates_new_version_and_keeps_previous PASSED
 tests/test_api.py::test_next_version_id PASSED
-9 passed
+11 passed
 ```
 
 El mismo resultado se obtuvo en Windows (Python 3.14.0) y en Docker (`python:3.12-slim`).
@@ -508,6 +541,8 @@ El mismo resultado se obtuvo en Windows (Python 3.14.0) y en Docker (`python:3.1
 |---|---|
 | `test_health_returns_200` | `/health` responde 200 con `status: ok` |
 | `test_valid_record_returns_prediction_and_version` | Una entrada válida devuelve 200 con `prediccion` y `version` |
+| `test_trailing_slash_is_accepted` | `/predict/` (con barra final) responde igual que `/predict` |
+| `test_wrong_method_explains_allowed_method` | `GET /predict` devuelve 405 e indica que se use `POST` |
 | `test_missing_required_field_is_rejected` | Sin `temp`, la respuesta es 422 y el mensaje nombra `temp` |
 | `test_null_value_is_imputed` | `hum: null` se imputa y devuelve 200 |
 | `test_incompatible_type_is_rejected` | `hr: "ocho"` devuelve 422 |
@@ -540,20 +575,16 @@ $env:MODEL_VERSION = "v1"; python -m uvicorn api.server:app --app-dir fase-3 --p
 
 ## 10. Detener el contenedor y relación con la fase 4
 
-La fase 4 **no es un servicio adicional**: es esta misma API con el registro de solicitudes habilitado, empaquetada en otra imagen (`bike-demand-monitor`). Ambas imágenes usan el puerto `8000`, por lo que **no pueden ejecutarse a la vez con el mismo puerto**. Si lo intenta, Docker responde `port is already allocated`.
+La fase 4 **no es un servicio adicional**: es esta misma API con el registro de solicitudes habilitado, empaquetada en otra imagen (`bike-demand-monitor`). Las dos fases usan **el mismo contenedor, `bike-api`**, de modo que en todo momento hay una sola API en ejecución:
 
-Antes de iniciar la fase 4, detenga el contenedor de la fase 3:
+| Quiero... | Imagen | Contenedor | Comando de inicio |
+|---|---|---|---|
+| Probar la API (fase 3) | `bike-demand-api` | `bike-api` | Sección 5, paso 4, de este README |
+| Probar la API registrando cada solicitud (fase 4) | `bike-demand-monitor` | `bike-api` | Sección 3, paso 4, de [fase-4/README.md](../fase-4/README.md) |
 
-```bash
-docker stop bike-api
-```
+El comando de inicio de cada fase empieza con `docker rm -f bike-api`, que detiene y elimina el contenedor que esté en ejecución, sea de la otra fase o de esta misma. Así se pasa de la fase 3 a la 4 (o al revés) sin conflictos de puerto ni de nombre, y aunque se publique la API en un puerto distinto de `8000`, nunca se crea un segundo contenedor.
 
-| Quiero... | Contenedor | Comando de inicio |
-|---|---|---|
-| Probar la API (fase 3) | `bike-api` (imagen `bike-demand-api`) | Sección 5 de este README |
-| Probar la API registrando cada solicitud (fase 4) | `bike-monitor` (imagen `bike-demand-monitor`) | Sección 3 de [fase-4/README.md](../fase-4/README.md) |
-
-Los dos contenedores comparten la misma carpeta de modelos (`fase-2/models`), así que una versión creada con `/train` en uno está disponible en el otro.
+Las dos imágenes leen la misma carpeta de modelos (`fase-2/models`), así que una versión creada con `/train` en la fase 3 está disponible en la fase 4.
 
 ---
 
@@ -562,8 +593,9 @@ Los dos contenedores comparten la misma carpeta de modelos (`fase-2/models`), as
 | Síntoma | Causa | Solución |
 |---|---|---|
 | `failed to connect to the docker API` | Docker Desktop no está en ejecución | Abrir Docker Desktop y esperar *Engine running* |
-| `Bind for 0.0.0.0:8000 failed: port is already allocated` | Otro contenedor (por ejemplo el de la fase 4) ya usa el puerto 8000 | `docker ps` para identificarlo, `docker stop bike-monitor` y luego `docker rm -f bike-api` para eliminar el contenedor que quedó creado sin iniciar; después repetir el paso 4 |
-| `Conflict. The container name "/bike-api" is already in use` | Quedó un contenedor anterior con ese nombre | `docker rm -f bike-api` y volver a iniciar |
+| `Conflict. The container name "/bike-api" is already in use` | Ya existe el contenedor de la API (de esta fase o de la fase 4) | Ejecutar `docker rm -f bike-api` y repetir el paso 4 |
+| `Bind for 0.0.0.0:8000 failed: port is already allocated` | Otro programa o contenedor ajeno al proyecto usa el puerto 8000 | `docker ps` para identificarlo y detenerlo, `docker rm -f bike-api` y repetir el paso 4. También se puede publicar la API en otro puerto con `-p 8001:8000` y usar `http://localhost:8001` |
+| `405` con `El método GET no está permitido...` | La solicitud a `/predict` o `/train` se envió con `GET` (método por defecto de Postman y del navegador) | Cambiar el método a `POST` (ver sección 6.2, *Crear la solicitud a mano*) |
 | El navegador no carga `localhost:8000` justo al iniciar | El modelo aún se está cargando | Esperar unos segundos y revisar `docker logs bike-api` |
 | `/health` muestra `model_loaded: false` y `/predict` responde 503 | La versión configurada no existe en `fase-2/models` o el volumen no se montó | Revisar el `-v` de modelos y el valor de `MODEL_VERSION` |
 | `422` en una solicitud que parece correcta | Falta un campo, hay un texto en lugar de número o un valor fuera de rango | Leer `detail`: indica el campo exacto |

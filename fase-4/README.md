@@ -25,26 +25,20 @@ La fase 4 registra cada llamada a `POST /predict` de la API de la fase 3 y calcu
 
 La fase 4 **no agrega un segundo servicio**: es la **misma API de la fase 3** (mismos endpoints `/health`, `/predict`, `/train` y `/docs`) con el registro de solicitudes habilitado. `fase-4/app.py` crea la API con `create_app(prediction_logger=CsvPredictionLogger(...))`, de modo que el código de la fase 3 no se modifica.
 
-Por eso hay **dos imágenes y se ejecuta una a la vez**:
+Hay **dos imágenes y un solo contenedor**:
 
 | Imagen | Contenedor | Puerto | ¿Registra solicitudes? | Documentación |
 |---|---|---|---|---|
 | `bike-demand-api` | `bike-api` | 8000 | No | [fase-3/README.md](../fase-3/README.md) |
-| `bike-demand-monitor` | `bike-monitor` | 8000 | Sí, en `fase-4/logs/predictions_log.csv` | Este README |
+| `bike-demand-monitor` | `bike-api` | 8000 | Sí, en `fase-4/logs/predictions_log.csv` | Este README |
 
-Ambas publican el puerto `8000`, así que **antes de iniciar la de la fase 4 hay que detener la de la fase 3**. Si no, Docker responde `Bind for 0.0.0.0:8000 failed: port is already allocated` y deja creado un contenedor `bike-monitor` sin iniciar, que se elimina con `docker rm -f bike-monitor`. Para evitarlo, detenga primero la API de la fase 3:
+Las dos fases inician el contenedor con el mismo nombre, `bike-api`, y el comando de inicio empieza con `docker rm -f bike-api`. Ese comando detiene y elimina la API que esté en ejecución, sea la de la fase 3 o una anterior de la fase 4, antes de crear la nueva. Por eso:
 
-```bash
-docker stop bike-api
-```
+- no hay que detener nada a mano al pasar de la fase 3 a la 4 (ni al revés);
+- no se producen conflictos de puerto ni de nombre;
+- aunque la API se publique en otro puerto del equipo (por ejemplo `-p 8001:8000`), Docker no permite un segundo contenedor con el mismo nombre, así que siempre hay una sola API en ejecución.
 
-Para comprobar que no queda ningún contenedor en el puerto 8000:
-
-```bash
-docker ps
-```
-
-Si se desea tener las dos en ejecución a la vez, la de la fase 4 puede publicarse en otro puerto del equipo con `-p 8001:8000`. En ese caso, todas las URL de este README cambian a `http://localhost:8001` (y el cliente se usa con `--url http://localhost:8001`).
+Para ver cuál está en ejecución, la columna `IMAGE` de `docker ps` muestra `bike-demand-api` (fase 3) o `bike-demand-monitor` (fase 4).
 
 ---
 
@@ -71,19 +65,14 @@ fase-4/
 
 Todos los comandos se ejecutan desde la **raíz del repositorio**. Los requisitos son los mismos de la fase 3 (Docker en ejecución; Python solo para el cliente y el script de métricas). Ver la [sección 5, paso 1, de la fase 3](../fase-3/README.md#paso-1-requisitos).
 
-### Paso 1. Detener la API de la fase 3 (si está en ejecución)
+### Paso 1. Revisar qué contenedor está en ejecución
 
 ```bash
-docker stop bike-api
+docker ps --filter name=bike-api
 ```
 
-Si responde `No such container`, no había nada en ejecución y se puede continuar.
-
-Si en un intento anterior apareció `port is already allocated` o `container name "/bike-monitor" is already in use`, elimine también el contenedor que quedó creado:
-
-```bash
-docker rm -f bike-monitor
-```
+- Si aparece `bike-api` con la imagen `bike-demand-api`, es la API de la fase 3. No hace falta detenerla: el paso 4 la reemplaza.
+- Si la lista está vacía, no hay ninguna API en ejecución.
 
 ### Paso 2. Construir la imagen de la fase 4
 
@@ -119,28 +108,33 @@ Porcentaje de fallos: sin solicitudes
 
 ### Paso 4. Iniciar la API con el registro habilitado
 
+La primera línea elimina el contenedor `bike-api` que exista (el de la fase 3 o uno anterior de esta fase). Si no había ninguno, Docker responde `No such container` y se continúa normalmente.
+
 **Windows (PowerShell):**
 
 ```powershell
+docker rm -f bike-api
 docker run -d --rm -p 8000:8000 `
   -v "${PWD}/fase-2/models:/app/fase-2/models" `
   -v "${PWD}/data:/app/data:ro" `
   -v "${PWD}/fase-4/logs:/app/fase-4/logs" `
-  --name bike-monitor bike-demand-monitor
+  --name bike-api bike-demand-monitor
 ```
 
 **Linux:**
 
 ```bash
+docker rm -f bike-api
 docker run -d --rm -p 8000:8000 --user "$(id -u):$(id -g)" \
   -v "$PWD/fase-2/models:/app/fase-2/models" \
   -v "$PWD/data:/app/data:ro" \
   -v "$PWD/fase-4/logs:/app/fase-4/logs" \
-  --name bike-monitor bike-demand-monitor
+  --name bike-api bike-demand-monitor
 ```
 
 | Opción | Efecto |
 |---|---|
+| `--name bike-api` | El mismo nombre de contenedor que la fase 3: solo puede existir una API a la vez |
 | `-v .../fase-2/models:...` | Modelos `v1`, `v2` y los creados con `/train` (los mismos de la fase 3) |
 | `-v .../data:...:ro` | Datos para `/train` (solo lectura) |
 | `-v .../fase-4/logs:/app/fase-4/logs` | **Registro persistente.** El CSV se escribe en `fase-4/logs/predictions_log.csv` del equipo y se conserva al detener el contenedor |
@@ -148,7 +142,7 @@ docker run -d --rm -p 8000:8000 --user "$(id -u):$(id -g)" \
 Compruebe que arrancó:
 
 ```bash
-docker logs bike-monitor
+docker logs bike-api
 ```
 
 Debe aparecer `Uvicorn running on http://0.0.0.0:8000`. Luego abra `http://localhost:8000/health` en el navegador. Debe mostrar `{"status":"ok","model_version":"v2","model_loaded":true}`.
@@ -198,7 +192,7 @@ Resultado esperado: 3 filas en el CSV, y el script muestra `Total de solicitudes
 ### Paso 7. Detener el contenedor
 
 ```bash
-docker stop bike-monitor
+docker stop bike-api
 ```
 
 El registro permanece en `fase-4/logs/predictions_log.csv`. Si vuelve a iniciar el contenedor, las solicitudes nuevas se agregan al final del mismo archivo.
@@ -322,12 +316,12 @@ python -m uvicorn app:app --app-dir fase-4 --port 8000
 - **Opción 1, sin reconstruir la imagen:** detener el contenedor y volver a iniciarlo añadiendo `-e MODEL_VERSION=v1` al comando `docker run` del paso 4.
 
   ```powershell
-  docker stop bike-monitor
+  docker rm -f bike-api
   docker run -d --rm -p 8000:8000 -e MODEL_VERSION=v1 `
     -v "${PWD}/fase-2/models:/app/fase-2/models" `
     -v "${PWD}/data:/app/data:ro" `
     -v "${PWD}/fase-4/logs:/app/fase-4/logs" `
-    --name bike-monitor bike-demand-monitor
+    --name bike-api bike-demand-monitor
   ```
 
 - **Opción 2, cambio permanente:** editar `model_version: v1` en `fase-3/configs/api.yaml` y reconstruir la imagen (paso 2).
@@ -344,7 +338,7 @@ Cada mes, o cuando se acumulen 720 horas nuevas (30 días) con el número real d
 
 ## 10. Reporte
 
-**Ejecución:** API de la fase 4 en Docker (contenedor `bike-monitor`, imagen `python:3.12-slim`, versión activa `v2`), partiendo de un registro vacío. Se siguieron los pasos 3 a 6 de la sección 3 con el cliente de Python.
+**Ejecución:** API de la fase 4 en Docker (contenedor `bike-api` con la imagen `bike-demand-monitor`, basada en `python:3.12-slim`; versión activa `v2`), partiendo de un registro vacío. Se siguieron los pasos 3 a 6 de la sección 3 con el cliente de Python.
 
 **Solicitudes enviadas:**
 

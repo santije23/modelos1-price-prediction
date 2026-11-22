@@ -674,14 +674,16 @@ Durante la validación de la fase 2 se realizaron pruebas de entrenamiento, pred
 
 ### Entrenamiento
 
-Se obtuvieron los siguientes resultados en las ejecuciones realizadas:
+Las dos versiones publicadas en el repositorio obtuvieron, sobre los mismos días reservados (`GroupShuffleSplit` por `dteday`, 20 %):
 
-| Ejecución | Configuración | MAE | RMSE | R² |
-|---|---|---:|---:|---:|
-| `v4` | `config.yaml` | 26,9511 | 45,1964 | 0,9345 |
-| `v5` | `versions/v2.yaml` | 26,8826 | 45,0202 | 0,9350 |
+| Versión | Configuración | Parámetros | MAE | RMSE | R² |
+|---|---|---|---:|---:|---:|
+| `v1` | `configs/config.yaml` | 100 árboles, `max_depth=15` | 26,9511 | 45,1964 | 0,9345 |
+| `v2` | `configs/versions/v2.yaml` | 120 árboles, `max_depth=18` | 26,8826 | 45,0202 | 0,9350 |
 
-Estos resultados corresponden a las ejecuciones de prueba identificadas como `v4` y `v5`. No deben confundirse con los identificadores oficiales `v1` y `v2` hasta que se ejecuten los entrenamientos con esos nombres.
+Los valores corresponden a `fase-2/models/v1/metrics.json` y `fase-2/models/v2/metrics.json`. Ambas versiones pueden cargarse directamente con `scripts/predict.py --model fase-2/models/v1` (o `v2`).
+
+> Nota: los modelos `v1` y `v2` se entrenaron antes de que `metadata.json` guardara la ruta de datos relativa; por eso su campo `data.path` conserva la ruta absoluta del equipo de entrenamiento. Las versiones nuevas guardan `data/processed/bike_share_with_nans.csv`. No se editaron los artefactos publicados para preservar su inmutabilidad.
 
 ### Pruebas automatizadas en Linux
 
@@ -694,7 +696,7 @@ Entorno utilizado:
 Resultado:
 
 ```text
-13 passed in 1.24s
+13 passed
 ```
 
 ### Pruebas automatizadas en Docker
@@ -708,7 +710,7 @@ Entorno utilizado:
 Resultado:
 
 ```text
-13 passed in 1.44s
+13 passed
 ```
 
 ### Prueba de entrenamiento en Docker

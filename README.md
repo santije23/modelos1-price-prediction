@@ -1,6 +1,6 @@
 # Predicción de la demanda horaria de bicicletas compartidas utilizando variables temporales y meteorológicas
 
-Proyecto Integrador - Modelos y Simulación de Sistemas I (Universidad de Antioquia) **Fase 1: Modelo predictivo**
+Proyecto Integrador - Modelos y Simulación de Sistemas I (Universidad de Antioquia)
 
 ## Integrantes del equipo
 
@@ -130,24 +130,25 @@ Al evaluar los modelos en el conjunto de prueba (20 % de los datos), el modelo *
 │   └── reports/
 │       ├── metricas_v1.json                            # Generado por el notebook
 │       └── figures/                                             # Gráficas generadas por el notebook
-├── fase-2/
-│   └── .gitkeep                                                 # Pendiente
-├── fase-3/
-│   └── .gitkeep                                                 # Pendiente
-├── fase-4/
-│   └── .gitkeep                                                 # Pendiente
+├── fase-2/                                       # Scripts de entrenamiento/predicción versionados y Docker
+│   ├── configs/  models/v1  models/v2  scripts/  src/bike_demand/  tests/
+│   └── README.md
+├── fase-3/                                       # API REST (FastAPI): /health, /predict, /train
+│   └── README.md
+├── fase-4/                                       # Registro de solicitudes y métricas de operación
+│   └── README.md
 ├── requirements.txt
 └── README.md
 ```
 
-El proyecto esta en fase de desarrollo y se organiza por fases. Las carpetas `fase-2`, `fase-3` y `fase-4` contienen únicamente un archivo `.gitkeep`, que permite conservar la estructura de carpetas en Git mientras se completan las etapas correspondientes.
+Cada fase tiene su propio README con las instrucciones de ejecución y los resultados obtenidos.
 
-|Fase|Contenido|Estado|
-|:--|:--|:--|
-|Fase 1|Modelo predictivo|Disponible|
-|Fase 2|Scripts y Docker|Pendiente|
-|Fase 3|API REST|Pendiente|
-|Fase 4|Monitoreo|Pendiente|
+|Fase|Contenido|Estado|Documentación|
+|:--|:--|:--|:--|
+|Fase 1|Modelo predictivo (notebook)|Disponible|Este README|
+|Fase 2|Scripts, versionamiento y Docker|Disponible|[fase-2/README.md](fase-2/README.md)|
+|Fase 3|API REST|Disponible|[fase-3/README.md](fase-3/README.md)|
+|Fase 4|Monitoreo|Disponible|[fase-4/README.md](fase-4/README.md)|
 
 El notebook localiza automáticamente la carpeta raíz del proyecto: busca, desde el directorio de trabajo hacia arriba, la primera carpeta que contenga `data/raw`. Por ello, debe ejecutarse desde dentro del repositorio.
 

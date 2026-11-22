@@ -61,6 +61,17 @@ def _git_commit(repo_root: Path) -> str:
         return "unknown"
 
 
+def _relative_to_root(path: str | Path, root: Path) -> str:
+    """Devuelve la ruta relativa a la raíz del repositorio cuando es posible."""
+
+    candidate = Path(path)
+
+    try:
+        return candidate.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return candidate.as_posix()
+
+
 def train_model(
     config: dict[str, Any],
     version: str | None = None,
@@ -221,7 +232,7 @@ def train_model(
         "seed": config["project"].get("seed", 42),
 
         "data": {
-            "path": str(data_cfg["raw_path"]),
+            "path": _relative_to_root(data_cfg["raw_path"], root),
             "rows": int(len(df)),
             "source": "Capital Bikeshare hourly dataset",
         },

@@ -1,7 +1,6 @@
 """Carga de versiones y predicción por filas."""
 
 from pathlib import Path
-from typing import Any
 import json
 
 import joblib
@@ -71,19 +70,6 @@ def predict_dataframe(
         index=df.index,
         name="prediccion",
     ).clip(lower=0)
-
-
-def predict(
-    df: pd.DataFrame,
-    config: dict[str, Any],
-) -> pd.Series:
-    """Predice utilizando el modelo indicado en la configuración."""
-
-    model_path = config["output"]["model_path"]
-
-    pipeline = load_model(model_path)
-
-    return predict_dataframe(df, pipeline)
 
 
 def load_version(version_dir: str | Path):

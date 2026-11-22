@@ -96,22 +96,23 @@ Al evaluar los modelos en el conjunto de prueba (20 % de los datos), el modelo *
 - **Prueba de sensibilidad a la temperatura:** al variar únicamente `temp` sobre un caso típico, la predicción aumenta con la temperatura hasta cierto punto y disminuye con el calor extremo, comportamiento coherente con el análisis exploratorio.
 - **Persistencia del modelo:** el modelo guardado en formato `.joblib` produce exactamente las mismas predicciones que el modelo en memoria, imputa por sí solo los valores faltantes de un registro nuevo y no genera predicciones negativas.
 
-## Limitaciones y mejoras futuras
+## Consideraciones del modelo y su atención en la fase 2
 
-**Limitaciones:**
+**Consideraciones identificadas en la fase 1:**
 
-- Cada día aparece hasta 24 veces (una fila por hora), por lo que la partición aleatoria puede dejar horas de un mismo día en ambos conjuntos. Esto puede hacer que las métricas de prueba sean algo optimistas frente a días completamente nuevos.
-- Existe un sobreajuste moderado: el R² en entrenamiento es de 0,9899, frente a 0,9272 en prueba.
-- Los valores faltantes fueron inyectados de forma simulada y no corresponden a fallos reales de sensores.
-- Los datos provienen de un único sistema y de un período específico (2011 y 2012), por lo que los patrones podrían no generalizarse a otros contextos ni incorporar factores externos como eventos especiales.
+- Cada día aparece hasta 24 veces (una fila por hora), por lo que una partición aleatoria puede dejar horas de un mismo día en entrenamiento y en prueba.
+- El R² en entrenamiento (0,9899) es mayor que en prueba (0,9272), lo que indica un sobreajuste moderado.
+- Los valores faltantes se inyectaron de forma controlada (MCAR) para justificar y probar la estrategia de imputación.
+- Los datos corresponden al sistema Capital Bikeshare en 2011 y 2012.
 
-**Mejoras futuras:**
+**Cómo se atendieron en la fase 2** ([fase-2/README.md](fase-2/README.md)):
 
-- Optimización de hiperparámetros (`GridSearchCV` o `RandomizedSearchCV`) y comparación con otros algoritmos, como `GradientBoostingRegressor`.
-- Validación agrupada por día (`GroupShuffleSplit` o `GroupKFold`) para obtener una estimación menos optimista del desempeño.
-- Reducción del error en horas pico, clima adverso y fines de semana, así como de la subestimación de los valores altos de demanda.
-- Reducción del sobreajuste limitando la profundidad de los árboles o ajustando `min_samples_leaf`.
-- Codificación cíclica (seno y coseno) de `hr`, `mnth` y `weekday`, y creación de variables derivadas, como la hora pico o interacciones entre hora y tipo de día.
+- **Partición agrupada por día:** `GroupShuffleSplit` por `dteday`, de modo que la evaluación usa días completos no vistos.
+- **Control del sobreajuste:** profundidad máxima de los árboles limitada (`max_depth=15` en `v1` y `18` en `v2`).
+- **Variables derivadas:** seno y coseno de `hr` y `mnth`, e indicador de hora pico en días laborales (`is_rush_hour`).
+- **Comparación de configuraciones:** dos versiones publicadas (`v1` y `v2`) evaluadas sobre los mismos días reservados.
+
+Con estos cambios, el desempeño en prueba pasó de un MAE de 29,34 y un R² de 0,9272 a un MAE de 26,88 y un R² de 0,9350 (`v2`), aun con una partición más exigente.
 
 ## Estructura del repositorio
 
@@ -158,7 +159,7 @@ El notebook localiza automáticamente la carpeta raíz del proyecto: busca, desd
 
 - **Python 3.11 o superior** (las versiones de `pandas` y `numpy` definidas en `requirements.txt` lo requieren).
 - **pip**, incluido con las instalaciones estándar de Python.
-- **Git** (opcional, solo si se clona el repositorio).
+- **Git**, para clonar el repositorio (también puede descargarse como ZIP).
 
 Comprobar la versión de Python instalada:
 
@@ -267,4 +268,4 @@ predicciones = modelo.predict(X_nuevos)  # X_nuevos: DataFrame con las 11 variab
 
 ### Reproducibilidad
 
-Todos los procesos aleatorios (partición de los datos, inyección de valores faltantes y entrenamiento del Random Forest) utilizan la semilla `random_state=42`. Para obtener resultados idénticos a los reportados, se recomienda usar las versiones exactas de las librerías definidas en `requirements.txt`.
+Todos los procesos aleatorios (partición de los datos, inyección de valores faltantes y entrenamiento del Random Forest) utilizan la semilla `random_state=42`. Los resultados reportados se obtuvieron con las versiones exactas de las librerías definidas en `requirements.txt`, que son las que se instalan con el paso 3.

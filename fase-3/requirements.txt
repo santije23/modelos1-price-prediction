@@ -1,0 +1,5 @@
+# Dependencias de la fase 3: las del proyecto más el servidor web.
+-r ../requirements.txt
+fastapi==0.165.0
+uvicorn==0.54.0
+httpx==0.28.1

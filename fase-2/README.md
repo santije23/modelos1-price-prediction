@@ -25,8 +25,8 @@
     - [Predicción dentro de Docker](#predicción-dentro-de-docker)
     - [Persistencia de archivos](#persistencia-de-archivos)
 12. [Resultados de las pruebas](#12-resultados-de-las-pruebas)
-13. [Limitaciones](#13-limitaciones)
-14. [Trabajo posterior](#14-trabajo-posterior)
+13. [Alcance de la evaluación](#13-alcance-de-la-evaluación)
+14. [Continuidad en las fases 3 y 4](#14-continuidad-en-las-fases-3-y-4)
 
 ---
 
@@ -160,7 +160,7 @@ Para ejecutar la fase 2 localmente se requiere:
 
 - Python 3.12 o superior.
 - pip.
-- Git (opcional, para clonar el repositorio).
+- Git, para clonar el repositorio.
 - Docker Engine o Docker Desktop, para ejecutar las pruebas en contenedores.
 
 Las dependencias de Python se encuentran declaradas en el archivo `requirements.txt` de la raíz del repositorio.
@@ -173,7 +173,7 @@ Los siguientes procedimientos se realizan desde la raíz del repositorio.
 
 ### Instalación en Windows
 
-Se recomienda utilizar PowerShell.
+Los comandos están escritos para PowerShell.
 
 #### 1. Crear el entorno virtual
 
@@ -378,7 +378,7 @@ En PowerShell puede utilizarse:
 Get-ChildItem fase-2/models -Recurse -File
 ```
 
-La política de versionamiento permite mantener varios modelos disponibles para su evaluación y utilización posterior.
+La política de versionamiento mantiene varios modelos disponibles a la vez: la API de la fase 3 usa estas mismas carpetas.
 
 ## 9. Predicción mediante archivos CSV
 
@@ -674,14 +674,16 @@ Durante la validación de la fase 2 se realizaron pruebas de entrenamiento, pred
 
 ### Entrenamiento
 
-Se obtuvieron los siguientes resultados en las ejecuciones realizadas:
+Las dos versiones publicadas en el repositorio obtuvieron, sobre los mismos días reservados (`GroupShuffleSplit` por `dteday`, 20 %):
 
-| Ejecución | Configuración | MAE | RMSE | R² |
-|---|---|---:|---:|---:|
-| `v4` | `config.yaml` | 26,9511 | 45,1964 | 0,9345 |
-| `v5` | `versions/v2.yaml` | 26,8826 | 45,0202 | 0,9350 |
+| Versión | Configuración | Parámetros | MAE | RMSE | R² |
+|---|---|---|---:|---:|---:|
+| `v1` | `configs/config.yaml` | 100 árboles, `max_depth=15` | 26,9511 | 45,1964 | 0,9345 |
+| `v2` | `configs/versions/v2.yaml` | 120 árboles, `max_depth=18` | 26,8826 | 45,0202 | 0,9350 |
 
-Estos resultados corresponden a las ejecuciones de prueba identificadas como `v4` y `v5`. No deben confundirse con los identificadores oficiales `v1` y `v2` hasta que se ejecuten los entrenamientos con esos nombres.
+Los valores corresponden a `fase-2/models/v1/metrics.json` y `fase-2/models/v2/metrics.json`. Ambas versiones pueden cargarse directamente con `scripts/predict.py --model fase-2/models/v1` (o `v2`).
+
+> Nota: los modelos `v1` y `v2` se entrenaron antes de que `metadata.json` guardara la ruta de datos relativa; por eso su campo `data.path` conserva la ruta absoluta del equipo de entrenamiento. Las versiones nuevas guardan `data/processed/bike_share_with_nans.csv`. No se editaron los artefactos publicados para preservar su inmutabilidad.
 
 ### Pruebas automatizadas en Linux
 
@@ -694,7 +696,7 @@ Entorno utilizado:
 Resultado:
 
 ```text
-13 passed in 1.24s
+13 passed
 ```
 
 ### Pruebas automatizadas en Docker
@@ -708,7 +710,7 @@ Entorno utilizado:
 Resultado:
 
 ```text
-13 passed in 1.44s
+13 passed
 ```
 
 ### Prueba de entrenamiento en Docker
@@ -747,24 +749,19 @@ Ambas ejecuciones identificaron correctamente la versión del modelo utilizada.
 
 Esta comprobación demuestra que el pipeline serializado puede cargarse y utilizarse en ambos entornos para procesar las mismas entradas.
 
-## 13. Limitaciones
+## 13. Alcance de la evaluación
 
-- Las métricas representan el desempeño obtenido sobre el conjunto de prueba utilizado y no garantizan el mismo rendimiento ante cualquier conjunto de datos futuro.
-- Los valores faltantes fueron simulados para evaluar el mecanismo de imputación y no representan necesariamente fallos reales de sensores.
-- El conjunto de datos corresponde a un sistema específico y a un período histórico limitado.
-- La calidad de las predicciones depende de que los datos de entrada tengan un esquema compatible con el utilizado durante el entrenamiento.
-- Las pruebas realizadas comprueban las funcionalidades implementadas, pero no sustituyen una evaluación de generalización con datos externos.
-- La fase 2 no proporciona todavía un servicio REST para consumir las predicciones desde otras aplicaciones.
+- Las métricas reportadas se calcularon sobre el 20 % de los días, reservados con `GroupShuffleSplit` por `dteday` y semilla 42.
+- Los valores faltantes de `hum` y `windspeed` se inyectaron de forma controlada (MCAR) para comprobar el mecanismo de imputación del pipeline.
+- Los datos corresponden al sistema Capital Bikeshare en 2011 y 2012.
+- Las entradas de predicción se validan contra el esquema de las 11 variables predictoras guardado en `metadata.json`.
 
-## 14. Trabajo posterior
+## 14. Continuidad en las fases 3 y 4
 
-La fase 2 establece la base para las siguientes etapas del proyecto.
+Las funciones de esta fase (`train_model`, `load_version`, `prepare_dataframe` y `predict_dataframe`) y las versiones `v1` y `v2` se reutilizan sin cambios en las fases siguientes:
 
-La fase 3 incorporará una API REST para exponer las funcionalidades de entrenamiento y predicción mediante endpoints HTTP.
-
-La fase 4 incorporará mecanismos de monitoreo y registro de solicitudes, cálculo de métricas operacionales, identificación de versiones activas y procedimientos de recuperación ante cambios de modelo.
-
-Estas etapas permitirán evolucionar el flujo de Machine Learning hacia un servicio reproducible y monitoreable.
+- **Fase 3** ([fase-3/README.md](../fase-3/README.md)): API REST con `GET /health`, `POST /predict` y `POST /train`.
+- **Fase 4** ([fase-4/README.md](../fase-4/README.md)): registro de cada solicitud a `/predict`, métricas de operación, versión activa y política de reentrenamiento.
 
 ---
 

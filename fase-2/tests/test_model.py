@@ -117,6 +117,7 @@ def test_train_saves_model_metrics_and_metadata(
 
     assert metadata["version"] == "v1"
     assert metadata["target"] == "cnt"
+    assert metadata["data"]["path"] == "raw.csv"
 
     assert (
         metadata["split"]["strategy"]

@@ -6,8 +6,6 @@ import sys
 
 from pathlib import Path
 
-import pandas as pd
-
 from sklearn.model_selection import GroupShuffleSplit
 
 sys.path.insert(
@@ -48,6 +46,7 @@ def main() -> None:
 
     X, y = prepare_dataframe(
         df,
+        cyclic_columns=config["features"].get("cyclic_columns"),
         target=config["data"]["target"],
     )
 

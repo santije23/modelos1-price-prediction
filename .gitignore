@@ -36,10 +36,14 @@ htmlcov/
 # ============================================================
 # Sistema Operativo
 # ============================================================
-.DS_Store           # macOS
-Thumbs.db           # Windows
-*.swp               # Vim
-*~                  # Editores varios
+# macOS
+.DS_Store
+# Windows
+Thumbs.db
+# Vim
+*.swp
+# Editores varios
+*~
 
 # ============================================================
 # IDE
@@ -68,3 +72,9 @@ fase-2/models/docker-v1/
 
 # Archivos temporales de evaluación
 fase-2/reports/tmp/
+
+# Modelo huérfano de una ejecución previa a la estructura versionada
+fase-2/models/model_v2.joblib
+
+# Registro vivo de la API (fase 4); la muestra entregable es sample_predictions_log.csv
+fase-4/logs/predictions_log.csv

@@ -32,6 +32,22 @@ def test_valid_record_returns_prediction_and_version(small_settings):
     assert body["prediccion"] >= 0
 
 
+def test_trailing_slash_is_accepted(small_settings):
+    response = _client(small_settings).post("/predict/", json=VALID_RECORD)
+
+    assert response.status_code == 200
+    assert response.json()["version"] == "v1"
+
+
+def test_wrong_method_explains_allowed_method(small_settings):
+    response = _client(small_settings).get("/predict")
+
+    assert response.status_code == 405
+    assert response.json()["detail"] == (
+        "El método GET no está permitido en /predict. Use POST."
+    )
+
+
 def test_missing_required_field_is_rejected(small_settings):
     record = {key: value for key, value in VALID_RECORD.items() if key != "temp"}
 

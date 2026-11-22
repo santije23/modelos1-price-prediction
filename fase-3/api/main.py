@@ -22,6 +22,7 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.settings import REPO_ROOT, Settings, load_settings
 
@@ -130,6 +131,21 @@ def _describe_errors(errors: list[dict[str, Any]]) -> tuple[str, list[dict[str, 
     return summary, details
 
 
+def _allowed_methods(app: FastAPI, path: str) -> str:
+    """Métodos declarados para ``path`` (por ejemplo ``POST``)."""
+
+    methods = sorted(
+        {
+            method
+            for route in app.routes
+            if getattr(route, "path", None) == path
+            for method in getattr(route, "methods", set()) or set()
+            if method != "HEAD"
+        }
+    )
+    return ", ".join(methods) or "otro método"
+
+
 def create_app(
     settings: Settings | None = None,
     prediction_logger: PredictionLogger | None = None,
@@ -144,6 +160,9 @@ def create_app(
         title="API de demanda de bicicletas",
         description="Predicción horaria de alquileres (Capital Bikeshare).",
         version="3.0.0",
+        # Sin redirección 307 de /predict/ a /predict: algunos clientes la
+        # siguen con GET. Las rutas aceptan ambas formas (ver más abajo).
+        redirect_slashes=False,
     )
     app.state.settings = settings
     app.state.store = store
@@ -158,7 +177,7 @@ def create_app(
     async def validation_handler(request: Request, exc: RequestValidationError):
         summary, details = _describe_errors(list(exc.errors()))
 
-        if request.url.path == PREDICT_PATH:
+        if request.url.path.rstrip("/") == PREDICT_PATH:
             _log(status.HTTP_422_UNPROCESSABLE_CONTENT, None, None)
 
         return JSONResponse(
@@ -166,6 +185,24 @@ def create_app(
             content={"detail": summary, "errores": details},
         )
 
+    @app.exception_handler(StarletteHTTPException)
+    async def http_error_handler(request: Request, exc: StarletteHTTPException):
+        detail = exc.detail
+        if exc.status_code == status.HTTP_405_METHOD_NOT_ALLOWED:
+            allowed = (exc.headers or {}).get("Allow") or _allowed_methods(
+                app, request.url.path
+            )
+            detail = (
+                f"El método {request.method} no está permitido en "
+                f"{request.url.path}. Use {allowed}."
+            )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": detail},
+            headers=exc.headers,
+        )
+
+    @app.get("/health/", include_in_schema=False)
     @app.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:
         return HealthResponse(
@@ -174,6 +211,7 @@ def create_app(
             model_loaded=store.loaded or store.load(),
         )
 
+    @app.post(PREDICT_PATH + "/", response_model=PredictResponse, include_in_schema=False)
     @app.post(PREDICT_PATH, response_model=PredictResponse)
     def predict(record: BikeRecord) -> PredictResponse:
         if not store.load():
@@ -199,6 +237,8 @@ def create_app(
         _log(status.HTTP_200_OK, store.version, value)
         return PredictResponse(prediccion=value, version=store.version)
 
+    @app.post("/train/", response_model=TrainResponse,
+              status_code=status.HTTP_201_CREATED, include_in_schema=False)
     @app.post("/train", response_model=TrainResponse, status_code=status.HTTP_201_CREATED)
     def train() -> TrainResponse:
         # Un entrenamiento a la vez para no competir por el mismo identificador.

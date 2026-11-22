@@ -1,0 +1,13 @@
+# Configuración de la API REST (fase 3).
+# Las rutas son relativas a la raíz del repositorio.
+
+# Versión que atiende POST /predict. Debe existir como carpeta en models_dir
+# (por ejemplo fase-2/models/v2/). Para volver a la anterior basta con
+# escribir v1 aquí o arrancar la API con la variable de entorno MODEL_VERSION=v1.
+model_version: v2
+
+# Carpeta donde viven las versiones (compartida con fase 2).
+models_dir: fase-2/models
+
+# Configuración de entrenamiento que usa POST /train (la misma de fase 2).
+train_config: fase-2/configs/config.yaml

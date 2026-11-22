@@ -10,6 +10,11 @@ RUN pip install --no-cache-dir -r fase-3/requirements.txt
 
 COPY . .
 
+# .git no entra a la imagen: el commit se pasa al construir para metadata.json.
+#   --build-arg GIT_COMMIT=$(git rev-parse HEAD)
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=${GIT_COMMIT}
+
 ENV PYTHONPATH="/app/fase-2/src:/app/fase-3"
 
 WORKDIR /app/fase-3

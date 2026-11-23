@@ -1,0 +1,286 @@
+{
+  "info": {
+    "name": "Demanda de bicicletas - API (fases 3 y 4)",
+    "description": "Solicitudes de prueba de la API. La variable baseUrl apunta a http://localhost:8000. Ejecutar en orden con Run collection para reproducir el reporte de la fase 4 (2 válidas + 1 inválida).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. GET /health",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('status ok', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        },
+        "description": "Estado de la API y versión configurada."
+      }
+    },
+    {
+      "name": "2. POST /predict - válida (fila 1 del CSV)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('prediccion y version', () => { const b = pm.response.json(); pm.expect(b).to.have.property('prediccion'); pm.expect(b).to.have.property('version'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/predict",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "predict"
+          ]
+        },
+        "description": "Fila 1 de data/example_prediction.csv. Esperado: 200 con prediccion y version.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"season\": 1,\n  \"yr\": 1,\n  \"mnth\": 6,\n  \"hr\": 8,\n  \"holiday\": 0,\n  \"weekday\": 1,\n  \"workingday\": 1,\n  \"weathersit\": 1,\n  \"temp\": 0.55,\n  \"hum\": 0.65,\n  \"windspeed\": 0.2\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "3. POST /predict - válida (fila 3 del CSV)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/predict",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "predict"
+          ]
+        },
+        "description": "Fila 3 de data/example_prediction.csv. Esperado: 200.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"season\": 2,\n  \"yr\": 1,\n  \"mnth\": 7,\n  \"hr\": 17,\n  \"holiday\": 0,\n  \"weekday\": 2,\n  \"workingday\": 1,\n  \"weathersit\": 2,\n  \"temp\": 0.7,\n  \"hum\": 0.5,\n  \"windspeed\": 0.15\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "4. POST /predict - falta temp (inválida)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 422', () => pm.response.to.have.status(422));",
+              "pm.test('mensaje nombra temp', () => pm.expect(pm.response.json().detail).to.include('temp'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/predict",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "predict"
+          ]
+        },
+        "description": "Sin la variable obligatoria temp. Esperado: 422 y un mensaje que nombra temp.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"season\": 1,\n  \"yr\": 1,\n  \"mnth\": 6,\n  \"hr\": 8,\n  \"holiday\": 0,\n  \"weekday\": 1,\n  \"workingday\": 1,\n  \"weathersit\": 1,\n  \"hum\": 0.65,\n  \"windspeed\": 0.2\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "5. POST /predict - hum null (imputado)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/predict",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "predict"
+          ]
+        },
+        "description": "hum = null representa un dato faltante; el pipeline lo imputa. Esperado: 200.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"season\": 1,\n  \"yr\": 1,\n  \"mnth\": 6,\n  \"hr\": 8,\n  \"holiday\": 0,\n  \"weekday\": 1,\n  \"workingday\": 1,\n  \"weathersit\": 1,\n  \"temp\": 0.55,\n  \"hum\": null,\n  \"windspeed\": 0.2\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "6. POST /predict - tipo incompatible",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 422', () => pm.response.to.have.status(422));",
+              "pm.test('mensaje nombra hr', () => pm.expect(pm.response.json().detail).to.include('hr'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/predict",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "predict"
+          ]
+        },
+        "description": "hr como texto. Esperado: 422 que nombra hr.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"season\": 1,\n  \"yr\": 1,\n  \"mnth\": 6,\n  \"hr\": \"ocho\",\n  \"holiday\": 0,\n  \"weekday\": 1,\n  \"workingday\": 1,\n  \"weathersit\": 1,\n  \"temp\": 0.55,\n  \"hum\": 0.65,\n  \"windspeed\": 0.2\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "7. POST /train",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "pm.test('version nueva', () => pm.expect(pm.response.json().version).to.match(/^v\\d+$/));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/train",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "train"
+          ]
+        },
+        "description": "Entrena una versión nueva con fase-2/configs/config.yaml. Cuerpo vacío. Tarda unos 20-30 s. Esperado: 201 con el identificador (v3, v4, ...)."
+      }
+    }
+  ]
+}

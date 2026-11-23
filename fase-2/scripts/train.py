@@ -1,26 +1,62 @@
-"""Script CLI para entrenar el modelo."""
+"""CLI de entrenamiento versionado."""
 
 import argparse
 import sys
 from pathlib import Path
 
-# Permite importar el paquete desde src/
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(
+    0,
+    str(Path(__file__).resolve().parents[1] / "src"),
+)
 
-from bike_demand.config import load_config  # noqa: E402
-from bike_demand.models.train import train_model  # noqa: E402
+from bike_demand.config import load_config
+from bike_demand.models.train import train_model
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Entrena el modelo de demanda de bicicletas.")
-    parser.add_argument("--config", required=True, help="Ruta al YAML de configuración.")
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Entrena y guarda una versión inmutable del modelo."
+    )
+
+    parser.add_argument(
+        "--config",
+        default="configs/config.yaml",
+        help="Configuración YAML.",
+    )
+
+    parser.add_argument(
+        "--version",
+        required=True,
+        help="Identificador único, por ejemplo v1 o v2.",
+    )
+
+    parser.add_argument(
+        "--output-dir",
+        help="Directorio de versiones; por defecto el configurado en YAML.",
+    )
+
     args = parser.parse_args()
 
-    config = load_config(args.config)
-    metrics = train_model(config)
-    print("Entrenamiento completado. Métricas en test:")
-    for k, v in metrics.items():
-        print(f"  {k}: {v:.4f}")
+    try:
+        result = train_model(
+            load_config(args.config),
+            version=args.version,
+            output_dir=args.output_dir,
+        )
+
+    except (
+        FileNotFoundError,
+        FileExistsError,
+        ValueError,
+        KeyError,
+    ) as exc:
+        parser.error(str(exc))
+
+    print(f"Entrenamiento completado: {result['version']}")
+    print(f"Artefactos: {result['version_dir']}")
+
+    for key in ("mae", "rmse", "r2"):
+        print(f"{key.upper()}: {result[key]:.4f}")
 
 
 if __name__ == "__main__":

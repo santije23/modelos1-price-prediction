@@ -1,0 +1,10 @@
+.venv/
+**/__pycache__/
+**/*.pyc
+.git/
+.pytest_cache/
+**/.ipynb_checkpoints/
+fase-1/models/
+fase-1/reports/figures/
+fase-*/outputs/
+fase-4/logs/

@@ -1,7 +1,0 @@
-data/
-models/
-reports/
-__pycache__/
-*.pyc
-.git/
-.pytest_cache/

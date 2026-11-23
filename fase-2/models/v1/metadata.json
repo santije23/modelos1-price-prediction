@@ -1,0 +1,130 @@
+{
+  "version": "v1",
+  "created_at": "2026-11-21T02:56:14.684973+00:00",
+  "problem_type": "regression",
+  "target": "cnt",
+  "algorithm": "RandomForestRegressor",
+  "model_params": {
+    "n_estimators": 100,
+    "max_depth": 15,
+    "random_state": 42,
+    "n_jobs": -1
+  },
+  "seed": 42,
+  "data": {
+    "path": "/home/santiago/GitHub/modelos1-price-prediction/data/processed/bike_share_with_nans.csv",
+    "rows": 17379,
+    "source": "Capital Bikeshare hourly dataset"
+  },
+  "split": {
+    "strategy": "GroupShuffleSplit by dteday",
+    "test_size": 0.2,
+    "train_rows": 13893,
+    "test_rows": 3486
+  },
+  "predictor_columns": [
+    "season",
+    "yr",
+    "mnth",
+    "hr",
+    "holiday",
+    "weekday",
+    "workingday",
+    "weathersit",
+    "temp",
+    "hum",
+    "windspeed"
+  ],
+  "predictor_schema": {
+    "season": {
+      "type": "number",
+      "nullable": true
+    },
+    "yr": {
+      "type": "number",
+      "nullable": true
+    },
+    "mnth": {
+      "type": "number",
+      "nullable": true
+    },
+    "hr": {
+      "type": "number",
+      "nullable": true
+    },
+    "holiday": {
+      "type": "number",
+      "nullable": true
+    },
+    "weekday": {
+      "type": "number",
+      "nullable": true
+    },
+    "workingday": {
+      "type": "number",
+      "nullable": true
+    },
+    "weathersit": {
+      "type": "number",
+      "nullable": true
+    },
+    "temp": {
+      "type": "number",
+      "nullable": true
+    },
+    "hum": {
+      "type": "number",
+      "nullable": true
+    },
+    "windspeed": {
+      "type": "number",
+      "nullable": true
+    }
+  },
+  "numeric_features_after_engineering": [
+    "temp",
+    "hum",
+    "windspeed",
+    "hr_sin",
+    "hr_cos",
+    "mnth_sin",
+    "mnth_cos"
+  ],
+  "categorical_features_after_engineering": [
+    "season",
+    "yr",
+    "mnth",
+    "hr",
+    "holiday",
+    "weekday",
+    "workingday",
+    "weathersit",
+    "is_rush_hour"
+  ],
+  "nullable_predictors": [
+    "season",
+    "yr",
+    "mnth",
+    "hr",
+    "holiday",
+    "weekday",
+    "workingday",
+    "weathersit",
+    "temp",
+    "hum",
+    "windspeed"
+  ],
+  "metrics_file": "metrics.json",
+  "model_file": "modelo.joblib",
+  "python_version": "3.14.8",
+  "scikit_learn_version": "1.9.1",
+  "dependencies": {
+    "numpy": "2.5.3",
+    "pandas": "3.0.6",
+    "scikit-learn": "1.9.1",
+    "joblib": "1.6.0",
+    "PyYAML": "6.0.3"
+  },
+  "dependencies_file": "requirements.txt",
+  "code_commit": "e89a3fe5145002183173df8a4ed992f3f13b203e"
+}
